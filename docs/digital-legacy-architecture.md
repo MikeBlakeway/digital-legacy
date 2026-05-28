@@ -1,8 +1,8 @@
 # Digital Legacy — Architecture & Requirements
 
-> **Working title:** Digital Legacy  
-> **Status:** Pre-development — architecture finalised, implementation pending  
-> **Author:** Mike Blakeway  
+> **Working title:** Digital Legacy
+> **Status:** Pre-development — architecture finalised, implementation pending
+> **Author:** Mike Blakeway
 > **Purpose:** Primary reference document for AI coding agents and developer context. All implementation decisions should be traceable to this document.
 
 ---
@@ -48,28 +48,33 @@ The system is designed for long-term durability, minimal ongoing cost, and compl
 Capture mode is the data ingestion interface used by living subjects.
 
 **Voice recording**
+
 - Subject can record voice samples directly in the browser (minimum target: 30 minutes of clean audio)
 - Recordings are segmented, labelled, and uploaded to B2
 - A voice readiness indicator shows progress toward a usable clone
 
 **Structured interviews**
+
 - The app presents guided question prompts (e.g. "What do you believe that most people around you don't?")
 - Subject responds by text or voice (voice is transcribed automatically)
 - Responses are stored as memories with the originating question as metadata
 - Interview sets are grouped by theme (values, fears, life stories, relationships, advice, etc.)
 
 **Free-form memory entry**
+
 - Subject can add a memory at any time as text, voice memo, or both
 - Optional metadata: approximate date, people involved, location, mood tags
 - Optional media attachment: photos or video clips associated with the memory
 
 **Media upload**
+
 - Photos and videos can be uploaded in bulk or individually
 - Each asset is stored in B2 and automatically captioned using a vision model
 - Captions are stored as memory embeddings in pgvector, making media searchable
 - Subject can edit or override auto-generated captions
 
 **Memory browser**
+
 - A searchable, filterable view of all captured memories
 - Shows what the model "knows" — essentially the training corpus in human-readable form
 - Subject can mark memories as private (excluded from family conversations)
@@ -80,21 +85,25 @@ Capture mode is the data ingestion interface used by living subjects.
 Conversation mode is the interaction interface for family members.
 
 **Text conversation**
+
 - Standard chat interface
 - The persona responds in the subject's voice and style, drawing on retrieved memories
 - Relevant media (photos, video) is surfaced inline when contextually appropriate
 
 **Voice conversation**
+
 - User speaks; audio is transcribed by Whisper (STT)
 - Persona response is synthesised using the subject's cloned voice (TTS)
 - Audio plays back in the browser
 - Full voice conversation loop: speak → transcribe → LLM → synthesise → play
 
 **Memory surfacing**
+
 - When a memory is retrieved during a conversation, the associated media (if any) is shown alongside the response
 - User can ask to see photos from a specific period, place, or event
 
 **Conversation history**
+
 - Each family member's conversation history is stored per-persona
 - History is used for within-session context only (not injected into subsequent sessions by default)
 - User can browse past conversations
@@ -166,6 +175,7 @@ Cold start latency (RunPod serverless worker spin-up) is acknowledged and accept
 All backend logic lives in Next.js API routes. There is no separate backend service for MVP.
 
 API routes are responsible for:
+
 - Authenticating requests (Supabase session validation)
 - Orchestrating calls to RunPod endpoints
 - Generating pre-signed B2 URLs for media upload/download
@@ -360,6 +370,7 @@ All routes are under `/app/api/`. Authentication is validated on every request v
 This is the most critical API route. It orchestrates the full RAG + inference pipeline.
 
 **Request**
+
 ```typescript
 {
   message: string          // user's text input (or transcribed voice)
@@ -369,6 +380,7 @@ This is the most critical API route. It orchestrates the full RAG + inference pi
 ```
 
 **Server-side pipeline**
+
 1. Validate session and persona access
 2. Embed the user message via RunPod `/embed`
 3. Retrieve top-K relevant memories from pgvector (k=8)
@@ -380,6 +392,7 @@ This is the most critical API route. It orchestrates the full RAG + inference pi
 9. Return response text, audio URL (if voice), and surfaced media assets
 
 **Response**
+
 ```typescript
 {
   message: string            // persona's text response
@@ -396,6 +409,7 @@ This is the most critical API route. It orchestrates the full RAG + inference pi
 ### 7.3 RunPod Endpoint Contracts
 
 **`POST /infer`**
+
 ```json
 {
   "input": {
@@ -406,9 +420,11 @@ This is the most critical API route. It orchestrates the full RAG + inference pi
   }
 }
 ```
+
 Response: `{ "output": { "text": "string" } }`
 
 **`POST /tts`**
+
 ```json
 {
   "input": {
@@ -418,9 +434,11 @@ Response: `{ "output": { "text": "string" } }`
   }
 }
 ```
+
 Response: `{ "output": { "audio_base64": "string", "duration_seconds": 0.0 } }`
 
 **`POST /stt`**
+
 ```json
 {
   "input": {
@@ -429,9 +447,11 @@ Response: `{ "output": { "audio_base64": "string", "duration_seconds": 0.0 } }`
   }
 }
 ```
+
 Response: `{ "output": { "transcript": "string", "duration_seconds": 0.0 } }`
 
 **`POST /embed`**
+
 ```json
 {
   "input": {
@@ -439,6 +459,7 @@ Response: `{ "output": { "transcript": "string", "duration_seconds": 0.0 } }`
   }
 }
 ```
+
 Response: `{ "output": { "embeddings": [[0.0, ...]] } }`
 
 ---
@@ -448,6 +469,7 @@ Response: `{ "output": { "embeddings": [[0.0, ...]] } }`
 The system prompt is constructed at inference time and has three parts:
 
 **1. Static identity block** (stored in `personas`, written by subject)
+
 ```
 You are [name]. You were born in [year] and lived in [places].
 You are speaking to members of your family after your death.
@@ -457,6 +479,7 @@ Never make up memories you are not given. Speak naturally, not formally.
 ```
 
 **2. Injected memory block** (retrieved per-query from pgvector)
+
 ```
 Here are some things you remember that are relevant to this conversation:
 
@@ -502,6 +525,7 @@ A minimum of 500 pairs is required before fine-tuning produces a noticeable pers
 ### 9.3 Output
 
 Trained adapter (`.safetensors`) is saved to:
+
 - B2: `adapters/{persona_slug}/v{n}/adapter.safetensors` (archive)
 - RunPod Network Volume: `adapters/{persona_slug}/current/` (active)
 
