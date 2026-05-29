@@ -9,7 +9,7 @@ import {
 
 export interface TtsInput {
   text: string;
-  speaker_wav_b2_key: string;
+  speaker_wav_b2_key: string | null;
   language?: string;
 }
 
