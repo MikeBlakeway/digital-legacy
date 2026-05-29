@@ -15,6 +15,7 @@
 /.DS_Store
 /.vscode
 /.idea
+/plans
 
 .env.local
 .env.development

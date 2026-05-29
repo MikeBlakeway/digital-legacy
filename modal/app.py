@@ -1,5 +1,7 @@
 import modal
 
+from download_models_impl import download_models_impl
+
 
 app = modal.App("digital-legacy")
 
@@ -48,7 +50,24 @@ infer_image = (
     ],
 )
 def download_models() -> None:
-    raise NotImplementedError("Implemented in Phase 2")
+    import os
+    from pathlib import Path
+
+    from huggingface_hub import snapshot_download
+
+    def write_text(path: str, content: str) -> None:
+        Path(path).write_text(content, encoding="utf-8")
+
+    download_models_impl(
+        snapshot_download=snapshot_download,
+        path_exists=os.path.exists,
+        list_dir=os.listdir,
+        make_dirs=os.makedirs,
+        write_text=write_text,
+        commit=volume.commit,
+        base_path="/model-weights",
+        hf_token=os.environ.get("HF_TOKEN"),
+    )
 
 
 @app.function(
@@ -59,7 +78,7 @@ def download_models() -> None:
     timeout=120,
     scaledown_window=30,
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def embed(item: dict) -> dict:
     raise NotImplementedError("Implemented in Phase 3")
 
@@ -72,7 +91,7 @@ def embed(item: dict) -> dict:
     timeout=120,
     scaledown_window=120,
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def stt(item: dict) -> dict:
     raise NotImplementedError("Implemented in Phase 3")
 
@@ -85,7 +104,7 @@ def stt(item: dict) -> dict:
     timeout=120,
     scaledown_window=120,
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def tts(item: dict) -> dict:
     raise NotImplementedError("Implemented in Phase 3")
 
@@ -101,6 +120,6 @@ def tts(item: dict) -> dict:
     timeout=600,
     scaledown_window=600,
 )
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def infer(item: dict) -> dict:
     raise NotImplementedError("Implemented in Phase 3")

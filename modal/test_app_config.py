@@ -101,6 +101,25 @@ class ModalAppConfigTests(unittest.TestCase):
                 f"Function {name} scaledown_window must be {scaledown}",
             )
 
+    def test_download_models_calls_download_impl(self) -> None:
+        functions = {node.name: node for node in self.tree.body if isinstance(node, ast.FunctionDef)}
+        download_fn = functions["download_models"]
+
+        self.assertFalse(
+            any(isinstance(node, ast.Raise) for node in download_fn.body),
+            "download_models should be implemented and not raise NotImplementedError",
+        )
+
+        self.assertTrue(
+            any(
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "download_models_impl"
+                for node in ast.walk(download_fn)
+            ),
+            "download_models should call download_models_impl",
+        )
+
 
 def find_assignments(tree: ast.Module) -> dict[str, ast.AST]:
     assignments: dict[str, ast.AST] = {}
@@ -202,7 +221,7 @@ def has_web_post_decorator(function: ast.FunctionDef) -> bool:
     for decorator in function.decorator_list:
         if not isinstance(decorator, ast.Call):
             continue
-        if not is_attr_call(decorator, ["modal", "web_endpoint"]):
+        if not is_attr_call(decorator, ["modal", "fastapi_endpoint"]):
             continue
 
         for keyword in decorator.keywords:
