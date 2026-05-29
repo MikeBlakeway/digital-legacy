@@ -1,0 +1,9 @@
+[
+  {
+    "corsRuleName": "digital-legacy-uploads",
+    "allowedOrigins": ["*"],
+    "allowedHeaders": ["*"],
+    "allowedOperations": ["s3_put", "s3_get", "s3_head"],
+    "maxAgeSeconds": 3600
+  }
+]
