@@ -6,8 +6,8 @@ import {
   EMBEDDING_DIMENSIONS,
   embedText,
   type EmbeddingVector,
-} from "@/lib/runpod/embed";
-import type { RunPodCallOptions } from "@/lib/runpod/client";
+} from "@/lib/ai/embed";
+import type { RunPodCallOptions } from "@/lib/ai/client";
 
 export type MemorySource = "interview" | "voice_memo" | "free_text" | "media_caption";
 

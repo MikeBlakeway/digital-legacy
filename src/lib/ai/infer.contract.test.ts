@@ -1,4 +1,4 @@
-import { inferPersona, type InferMessage } from "@/lib/runpod/infer";
+import { inferPersona, type InferMessage } from "@/lib/ai/infer";
 
 const messages: InferMessage[] = [{ role: "user", content: "Hello" }];
 

@@ -4,10 +4,10 @@ import {
   createPresignedDownloadUrl,
   createPresignedUploadUrl,
 } from "@/lib/b2/client";
-import { embedTexts } from "@/lib/runpod/embed";
-import { inferText, type InferMessage } from "@/lib/runpod/infer";
-import { transcribeAudio } from "@/lib/runpod/stt";
-import { synthesizeSpeech } from "@/lib/runpod/tts";
+import { embedTexts } from "@/lib/ai/embed";
+import { inferText, type InferMessage } from "@/lib/ai/infer";
+import { transcribeAudio } from "@/lib/ai/stt";
+import { synthesizeSpeech } from "@/lib/ai/tts";
 import {
   retrieveMemoriesByEmbedding,
   retrieveMemoriesForText,

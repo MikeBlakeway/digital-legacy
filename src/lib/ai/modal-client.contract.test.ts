@@ -1,11 +1,11 @@
 import {
   callRunPodEndpoint,
   type RunPodFetch,
-} from "@/lib/runpod/client";
-import { embedTexts } from "@/lib/runpod/embed";
-import { inferPersona } from "@/lib/runpod/infer";
-import { transcribeAudio } from "@/lib/runpod/stt";
-import { synthesizeSpeech } from "@/lib/runpod/tts";
+} from "@/lib/ai/client";
+import { embedTexts } from "@/lib/ai/embed";
+import { inferPersona } from "@/lib/ai/infer";
+import { transcribeAudio } from "@/lib/ai/stt";
+import { synthesizeSpeech } from "@/lib/ai/tts";
 
 async function client_posts_to_modal_url_with_json() {
   let capturedUrl = "";

@@ -5,7 +5,7 @@ import {
   callRunPodEndpoint,
   isRecord,
   type RunPodCallOptions,
-} from "@/lib/runpod/client";
+} from "@/lib/ai/client";
 
 export const EMBEDDING_DIMENSIONS = 768;
 

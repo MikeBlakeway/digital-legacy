@@ -5,16 +5,15 @@ import { fileURLToPath } from "node:url";
 
 import { config as loadDotenv } from "dotenv";
 
-import type { InferInput } from "../src/lib/runpod/infer";
-import type { TtsInput } from "../src/lib/runpod/tts";
+import type { InferInput } from "../src/lib/ai/infer";
+import type { TtsInput } from "../src/lib/ai/tts";
 
 const REEXEC_ENV = "DIGITAL_LEGACY_REACT_SERVER_REEXEC";
 const REQUIRED_ENV = [
-  "RUNPOD_API_KEY",
-  "RUNPOD_EMBED_ENDPOINT_ID",
-  "RUNPOD_INFER_ENDPOINT_ID",
-  "RUNPOD_STT_ENDPOINT_ID",
-  "RUNPOD_TTS_ENDPOINT_ID",
+  "MODAL_EMBED_URL",
+  "MODAL_INFER_URL",
+  "MODAL_STT_URL",
+  "MODAL_TTS_URL",
 ];
 
 const TEST_TIMEOUT_MS = 300_000;
@@ -63,10 +62,10 @@ async function main(): Promise<void> {
     { transcribeAudio },
     { synthesizeSpeech },
   ] = await Promise.all([
-    import("../src/lib/runpod/embed"),
-    import("../src/lib/runpod/infer"),
-    import("../src/lib/runpod/stt"),
-    import("../src/lib/runpod/tts"),
+    import("../src/lib/ai/embed"),
+    import("../src/lib/ai/infer"),
+    import("../src/lib/ai/stt"),
+    import("../src/lib/ai/tts"),
   ]);
 
   await runTest("embed", async () => {

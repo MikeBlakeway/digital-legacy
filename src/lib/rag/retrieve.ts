@@ -2,8 +2,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { embedText, type EmbeddingVector } from "@/lib/runpod/embed";
-import type { RunPodCallOptions } from "@/lib/runpod/client";
+import { embedText, type EmbeddingVector } from "@/lib/ai/embed";
+import type { RunPodCallOptions } from "@/lib/ai/client";
 import { RagDatabaseError, validateEmbedding } from "@/lib/rag/embed";
 
 const DEFAULT_MEMORY_MATCH_LIMIT = 8;

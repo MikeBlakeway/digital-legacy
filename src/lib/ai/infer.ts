@@ -5,7 +5,7 @@ import {
   getModalEndpointUrl,
   isRecord,
   type RunPodCallOptions,
-} from "@/lib/runpod/client";
+} from "@/lib/ai/client";
 
 export const DEFAULT_INFER_TIMEOUT_MS = 590_000;
 
