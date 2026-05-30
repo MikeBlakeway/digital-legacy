@@ -71,7 +71,7 @@ volume = modal.Volume.from_name(
 
 base_image = (
     modal.Image.debian_slim(python_version="3.11")
-    .pip_install(["huggingface_hub", "boto3"])
+    .pip_install(["huggingface_hub", "boto3", "fastapi[standard]"])
 )
 
 embed_image = base_image.pip_install([
@@ -95,6 +95,7 @@ infer_image = (
     .pip_install([
         "vllm",
         "huggingface_hub",
+        "fastapi[standard]",
     ])
 )
 
