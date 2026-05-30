@@ -221,12 +221,10 @@ function isLikelyMissingVoiceSample(error: unknown): boolean {
   const text = formatUnknown(error).toLowerCase();
 
   return (
-    text.includes("speaker") ||
-    text.includes("voice") ||
     text.includes("speaker_wav") ||
-    text.includes("b2") ||
-    text.includes("sample") ||
-    text.includes("default")
+    text.includes("speaker_wav_b2_key") ||
+    text.includes("missing speaker") ||
+    text.includes("voice sample")
   );
 }
 

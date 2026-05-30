@@ -36,4 +36,48 @@ supabase db push
 npm run dev
 npm run build
 npm run lint
+npm run validate:modal
+```
+
+## AI Endpoints (Modal)
+
+This project uses Modal web endpoints for AI inference:
+
+- `infer` (Llama 3.1 + LoRA)
+- `tts` (XTTS v2)
+- `stt` (faster-whisper)
+- `embed` (nomic-embed-text)
+
+Deploy the Modal app:
+
+```bash
+modal deploy modal/app.py
+```
+
+Bootstrap model weights into the Modal volume (one-time, 60-90 minutes):
+
+```bash
+modal run modal/app.py::download_models
+```
+
+## Vercel Environment Variables
+
+After `modal deploy`, Modal prints four endpoint URLs. Add them to Vercel project environment variables and local `.env.local`:
+
+- `MODAL_INFER_URL`
+- `MODAL_TTS_URL`
+- `MODAL_STT_URL`
+- `MODAL_EMBED_URL`
+
+Example pattern:
+
+- `https://mikeblakeway--digital-legacy-infer.modal.run`
+- `https://mikeblakeway--digital-legacy-tts.modal.run`
+- `https://mikeblakeway--digital-legacy-stt.modal.run`
+- `https://mikeblakeway--digital-legacy-embed.modal.run`
+
+Run the endpoint smoke test:
+
+```bash
+npx tsx scripts/test_endpoints.ts
 ```

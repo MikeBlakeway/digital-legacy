@@ -1,7 +1,7 @@
 # Digital Legacy — Architecture & Requirements
 
 > **Working title:** Digital Legacy
-> **Status:** Pre-development — architecture finalised, implementation pending
+> **Status:** Active development — Modal migration and implementation in progress
 > **Author:** Mike Blakeway
 > **Purpose:** Primary reference document for AI coding agents and developer context. All implementation decisions should be traceable to this document.
 
@@ -28,7 +28,7 @@ The system is designed for long-term durability, minimal ongoing cost, and compl
 - **Privacy above all** — no personal data, voice, or memories leave the controlled infrastructure stack
 - **Local-first logic** — business logic and AI inference run on owned/rented private compute, not third-party AI APIs
 - **Longevity by design** — architecture must remain functional and maintainable over decades; avoid deep lock-in to any single vendor
-- **Graceful degradation** — if a RunPod endpoint is cold or unavailable, text fallback must always work
+- **Graceful degradation** — if a Modal endpoint is cold or unavailable, text fallback must always work
 - **Emotional considered design** — the conversation UI is used by grieving family members; UX decisions must reflect this
 
 ---
@@ -123,7 +123,7 @@ Conversation mode is the interaction interface for family members.
 
 ### 3.1 Privacy & Data Sovereignty
 
-- All AI inference (LLM, TTS, STT, embeddings) runs on RunPod private GPU instances
+- All AI inference (LLM, TTS, STT, embeddings) runs on private Modal GPU workers
 - No OpenAI, Anthropic, Google, or other third-party AI APIs are called with personal data
 - Media is stored on Backblaze B2 under a private bucket; no public URLs are generated
 - All B2 access uses pre-signed URLs with a 15-minute expiry
@@ -133,18 +133,18 @@ Conversation mode is the interaction interface for family members.
 
 | Operation | Target latency |
 |---|---|
-| Text response (first token) | < 3 seconds (warm RunPod worker) |
+| Text response (first token) | < 3 seconds (warm Modal worker) |
 | Full text response | < 10 seconds |
 | STT transcription (30s audio) | < 5 seconds |
 | TTS synthesis (150-word response) | < 8 seconds |
 | Memory retrieval (pgvector search) | < 200ms |
 | Media upload (per file) | Direct-to-B2, no server bottleneck |
 
-Cold start latency (RunPod serverless worker spin-up) is acknowledged and acceptable for MVP. Workers should be configured to maintain at least one warm instance during expected usage hours.
+Cold start latency (Modal web endpoints worker spin-up) is acknowledged and acceptable for MVP. Workers should be configured to maintain at least one warm instance during expected usage hours.
 
 ### 3.3 Reliability
 
-- RunPod endpoint failures must degrade gracefully: text conversation falls back to response without voice
+- Modal endpoint failures must degrade gracefully: text conversation falls back to response without voice
 - The app must display a clear status indicator when AI services are unavailable
 - Supabase free tier provides adequate uptime for a low-traffic family application
 - B2 provides 99.9% availability SLA
@@ -153,7 +153,7 @@ Cold start latency (RunPod serverless worker spin-up) is acknowledged and accept
 
 - All AI model weights and LoRA adapters are stored in B2 as the source of truth
 - No reliance on any model vendor's hosted inference; all models are open-weights
-- The application must be re-deployable from scratch using stored weights and a fresh RunPod account
+- The application must be re-deployable from scratch using stored weights and a fresh Modal account
 - Dependencies are pinned and documented
 
 ---
@@ -177,7 +177,7 @@ All backend logic lives in Next.js API routes. There is no separate backend serv
 API routes are responsible for:
 
 - Authenticating requests (Supabase session validation)
-- Orchestrating calls to RunPod endpoints
+- Orchestrating calls to Modal endpoints
 - Generating pre-signed B2 URLs for media upload/download
 - Writing to and reading from Supabase
 
@@ -189,9 +189,9 @@ API routes are responsible for:
 | Vector store | Supabase pgvector | Eliminates separate vector DB; memory retrieval co-located with structured data |
 | Auth | Supabase Auth | Role-based access; integrates with RLS policies |
 
-### 4.4 AI Inference (RunPod Serverless)
+### 4.4 AI Inference (Modal Web Endpoints)
 
-All AI inference runs as RunPod serverless endpoints. Each endpoint is a Docker container with a Python handler using the RunPod SDK.
+All AI inference runs as Modal web endpoints. Each endpoint is a Python function deployed with the Modal SDK.
 
 | Endpoint | Model | Hardware | Notes |
 |---|---|---|---|
@@ -200,9 +200,9 @@ All AI inference runs as RunPod serverless endpoints. Each endpoint is a Docker 
 | `/stt` | faster-whisper (large-v3) | RTX 3090 | Audio transcription |
 | `/embed` | nomic-embed-text | RTX 3090 | Text → vector for pgvector ingestion |
 
-**Model weights** are stored on a **RunPod Network Volume** for fast loading. B2 is the backup/source-of-truth for weights; the network volume is operational working storage.
+**Model weights** are stored on a **Modal Volume** for fast loading. B2 is the backup/source-of-truth for weights; the Modal Volume is operational working storage.
 
-**Fine-tuning** is a separate on-demand pod job (not serverless), triggered manually. Uses Unsloth + QLoRA on an RTX 4090 or A100 pod. Output adapter is saved to B2 and copied to the network volume.
+**Fine-tuning** is a separate on-demand GPU job, triggered manually. Uses Unsloth + QLoRA on an RTX 4090 or A100. Output adapter is saved to B2 and copied to the Modal Volume.
 
 ### 4.5 Storage
 
@@ -212,7 +212,7 @@ All AI inference runs as RunPod serverless endpoints. Each endpoint is a Docker 
 | Voice samples | Backblaze B2 | Stored under `/voice-samples/{persona_id}/` |
 | TTS audio cache | Backblaze B2 | Rendered audio responses cached to avoid re-synthesis |
 | Model weights (archive) | Backblaze B2 | Source of truth for all model files |
-| Model weights (operational) | RunPod Network Volume | Fast-access working storage for active endpoints |
+| Model weights (operational) | Modal Volume | Fast-access working storage for active endpoints |
 
 B2 is accessed via the S3-compatible API using `@aws-sdk/client-s3` pointed at the B2 endpoint. No Backblaze-specific SDK required.
 
@@ -229,12 +229,12 @@ Browser
         │     └── pgvector (memory embeddings)
         ├── Backblaze B2 (media, voice, weights archive)
         │     └── Pre-signed URLs only — client uploads/downloads directly
-        └── RunPod Serverless
+        └── Modal Web Endpoints
               ├── /infer  (LLM + LoRA)
               ├── /tts    (XTTS v2)
               ├── /stt    (Whisper)
               └── /embed  (nomic-embed-text)
-                    └── RunPod Network Volume (operational model weights)
+                    └── Modal Volume (operational model weights)
 ```
 
 ---
@@ -382,12 +382,12 @@ This is the most critical API route. It orchestrates the full RAG + inference pi
 **Server-side pipeline**
 
 1. Validate session and persona access
-2. Embed the user message via RunPod `/embed`
+2. Embed the user message via Modal `/embed`
 3. Retrieve top-K relevant memories from pgvector (k=8)
 4. Retrieve any associated media assets for retrieved memories
 5. Build system prompt with persona context and retrieved memories
-6. Call RunPod `/infer` with full message history + context
-7. If `mode === 'voice'`: call RunPod `/tts` with response text; store audio to B2
+6. Call Modal `/infer` with full message history + context
+7. If `mode === 'voice'`: call Modal `/tts` with response text; store audio to B2
 8. Store user message and assistant response in `messages`
 9. Return response text, audio URL (if voice), and surfaced media assets
 
@@ -406,65 +406,53 @@ This is the most critical API route. It orchestrates the full RAG + inference pi
 }
 ```
 
-### 7.3 RunPod Endpoint Contracts
+### 7.3 Modal Endpoint Contracts
 
 **`POST /infer`**
-
 ```json
 {
-  "input": {
-    "system_prompt": "string",
-    "messages": [{"role": "user|assistant", "content": "string"}],
-    "max_tokens": 512,
-    "temperature": 0.7
-  }
+  "system_prompt": "string",
+  "messages": [{"role": "user|assistant", "content": "string"}],
+  "max_tokens": 512,
+  "temperature": 0.7,
+  "persona_slug": "optional-string"
 }
 ```
 
-Response: `{ "output": { "text": "string" } }`
+Response: `{ "text": "string" }`
 
 **`POST /tts`**
 
 ```json
 {
-  "input": {
-    "text": "string",
-    "speaker_wav_b2_key": "string",
-    "language": "en"
-  }
+  "text": "string",
+  "speaker_wav_b2_key": "voice-samples/persona-123/ref.wav",
+  "language": "en"
 }
 ```
 
-Response: `{ "output": { "audio_base64": "string", "duration_seconds": 0.0 } }`
+Response: `{ "audio_base64": "base64-encoded-wav" }`
 
 **`POST /stt`**
 
 ```json
 {
-  "input": {
-    "audio_base64": "string",
-    "language": "en"
-  }
+  "audio_base64": "base64-encoded-wav",
+  "language": "en"
 }
 ```
 
-Response: `{ "output": { "transcript": "string", "duration_seconds": 0.0 } }`
+Response: `{ "transcript": "string", "duration_seconds": 0.0 }`
 
 **`POST /embed`**
 
 ```json
 {
-  "input": {
-    "texts": ["string"]
-  }
+  "texts": ["string"]
 }
 ```
 
-Response: `{ "output": { "embeddings": [[0.0, ...]] } }`
-
----
-
-## 8. Persona System Prompt Design
+Response: `{ "embeddings": [[0.0, ...]] }`
 
 The system prompt is constructed at inference time and has three parts:
 
@@ -473,9 +461,6 @@ The system prompt is constructed at inference time and has three parts:
 ```
 You are [name]. You were born in [year] and lived in [places].
 You are speaking to members of your family after your death.
-Respond as yourself — in your own voice, with your own opinions and memories.
-Do not pretend to be an AI. If you don't remember something, say so honestly.
-Never make up memories you are not given. Speak naturally, not formally.
 ```
 
 **2. Injected memory block** (retrieved per-query from pgvector)
@@ -495,7 +480,7 @@ Standard `[{role, content}]` array appended as prior turns.
 
 ## 9. Fine-tuning Pipeline
 
-Fine-tuning is a manual, occasional process run on a RunPod on-demand pod.
+Fine-tuning is a manual, occasional process run on a dedicated GPU fine-tuning job.
 
 ### 9.1 Training Data Format
 
@@ -527,9 +512,9 @@ A minimum of 500 pairs is required before fine-tuning produces a noticeable pers
 Trained adapter (`.safetensors`) is saved to:
 
 - B2: `adapters/{persona_slug}/v{n}/adapter.safetensors` (archive)
-- RunPod Network Volume: `adapters/{persona_slug}/current/` (active)
+- Modal Volume: `adapters/{persona_slug}/current/` (active)
 
-Updating the active adapter requires restarting the RunPod serverless worker (or a rolling restart via the RunPod API).
+Updating the active adapter requires a warm worker refresh (or a redeploy) so the latest adapter path is picked up.
 
 ---
 
@@ -540,8 +525,8 @@ Updating the active adapter requires restarting the RunPod serverless worker (or
 ```env
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
 
 # Backblaze B2
 B2_KEY_ID=
@@ -550,24 +535,22 @@ B2_BUCKET_NAME=
 B2_ENDPOINT=https://s3.us-west-004.backblazeb2.com
 B2_REGION=us-west-004
 
-# RunPod
-RUNPOD_API_KEY=
-RUNPOD_INFER_ENDPOINT_ID=
-RUNPOD_TTS_ENDPOINT_ID=
-RUNPOD_STT_ENDPOINT_ID=
-RUNPOD_EMBED_ENDPOINT_ID=
+# Modal
+MODAL_INFER_URL=
+MODAL_TTS_URL=
+MODAL_STT_URL=
+MODAL_EMBED_URL=
 ```
 
-### RunPod Docker Containers
+### Modal Functions Runtime
 
 ```env
-# Each container reads from RunPod secrets
-RUNPOD_API_KEY=
+# Each function reads from Modal secrets
 B2_KEY_ID=
 B2_APP_KEY=
 B2_BUCKET_NAME=
 B2_ENDPOINT=
-NETWORK_VOLUME_PATH=/runpod-volume
+HF_TOKEN=
 ```
 
 ---
@@ -598,21 +581,10 @@ NETWORK_VOLUME_PATH=/runpod-volume
 ├── lib/
 │   ├── supabase/             -- client, server, middleware helpers
 │   ├── b2/                   -- S3 client configured for B2
-│   ├── runpod/               -- typed wrappers for each endpoint
+│   ├── ai/                   -- typed wrappers for each Modal endpoint
 │   └── rag/                  -- embed, retrieve, build-context helpers
-├── runpod/                   -- Docker containers for RunPod endpoints
-│   ├── infer/
-│   │   ├── Dockerfile
-│   │   └── handler.py
-│   ├── tts/
-│   │   ├── Dockerfile
-│   │   └── handler.py
-│   ├── stt/
-│   │   ├── Dockerfile
-│   │   └── handler.py
-│   └── embed/
-│       ├── Dockerfile
-│       └── handler.py
+├── modal/
+│   └── app.py                -- Modal app and endpoint functions
 ├── supabase/
 │   ├── migrations/
 │   └── seed.sql
@@ -636,7 +608,7 @@ NETWORK_VOLUME_PATH=/runpod-volume
 - [x] Memory browser (subject)
 - [x] Media surfacing in conversation
 - [x] pgvector RAG retrieval
-- [x] RunPod serverless endpoints for all four AI functions
+- [x] Modal web endpoints for all four AI functions
 - [x] B2 storage for all media
 
 ### Out of scope (post-MVP)
@@ -669,7 +641,7 @@ NETWORK_VOLUME_PATH=/runpod-volume
 
 | Decision | Rationale | Alternatives considered |
 |---|---|---|
-| RunPod serverless over self-hosted GPU | Deployable without dedicated hardware; pay-per-use suitable for low-traffic app; no hardware maintenance | Local GPU (rejected: not portable); cloud GPU via AWS/GCP (rejected: cost) |
+| Modal web endpoints over self-hosted GPU | Deployable without dedicated hardware; pay-per-use suitable for low-traffic app; no hardware maintenance | Local GPU (rejected: not portable); cloud GPU via AWS/GCP (rejected: cost) |
 | Backblaze B2 over S3 | ~75% cheaper than S3; S3-compatible API; free egress to Cloudflare | AWS S3 (rejected: cost); Cloudflare R2 (viable alternative) |
 | Supabase pgvector over dedicated vector DB | Eliminates separate service; co-located with structured data; sufficient for <100k memories | Qdrant (rejected: extra service); ChromaDB (rejected: not production-ready) |
 | Llama 3.1 8B over larger models | Fits RTX 4090 comfortably with LoRA; fast inference; quality sufficient for persona task | Llama 3.1 70B (rejected: cost/latency); Mistral 7B (viable fallback) |
