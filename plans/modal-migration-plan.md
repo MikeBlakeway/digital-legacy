@@ -3,6 +3,7 @@
 This plan fully replaces RunPod with Modal across infrastructure, application code, scripts, and documentation. It uses incremental TDD phases to preserve request and response contracts while removing all RunPod code paths. The migration is a direct cutover with no dual-provider compatibility layer.
 
 **Phases 6**
+
 1. **Phase 1: Create Modal App and Shared Runtime**
     - **Objective:** Add the Modal application entrypoint with shared volume, base image config, and deployable structure.
     - **Files/Functions to Modify/Create:** `modal/app.py` (new)
@@ -13,9 +14,9 @@ This plan fully replaces RunPod with Modal across infrastructure, application co
     - **Steps:**
         1. Write failing tests that assert app, volume, and per-function image configuration are defined in `modal/app.py`.
         2. Implement `app = modal.App("digital-legacy")`, `volume = modal.Volume.from_name("digital-legacy-weights", create_if_missing=True)`, and shared image configuration.
-      3. Wire secrets in function decorators so each function includes `secrets=[modal.Secret.from_name("digital-legacy-b2")]`.
-      4. Ensure `download_models` and `infer` additionally include `modal.Secret.from_name("huggingface")` and create this Modal secret with key `HF_TOKEN` before Phase 2 execution.
-      5. Run tests and confirm they pass with the new module structure.
+        3. Wire secrets in function decorators so each function includes `secrets=[modal.Secret.from_name("digital-legacy-b2")]`.
+        4. Ensure `download_models` and `infer` additionally include `modal.Secret.from_name("huggingface")` and create this Modal secret with key `HF_TOKEN` before Phase 2 execution.
+        5. Run tests and confirm they pass with the new module structure.
 
 2. **Phase 2: Implement Volume Model Bootstrap Function**
     - **Objective:** Replace the old temporary download approach with a Modal volume bootstrap function.
@@ -27,9 +28,9 @@ This plan fully replaces RunPod with Modal across infrastructure, application co
     - **Steps:**
         1. Write failing tests for model skip logic, per-model commit behavior, and adapters directory creation.
         2. Implement `download_models` using `snapshot_download` and `volume.commit()` after each model.
-      3. Re-run tests and confirm idempotent behavior.
-      4. After tests pass, run `modal run modal/app.py::download_models`.
-      5. Monitor progress in Modal Logs, expect 60-90 minutes, and confirm all four model directories exist in the volume before starting Phase 3.
+        3. Re-run tests and confirm idempotent behavior.
+        4. After tests pass, run `modal run modal/app.py::download_models`.
+        5. Monitor progress in Modal Logs, expect 60-90 minutes, and confirm all four model directories exist in the volume before starting Phase 3.
 
 3. **Phase 3: Implement Four Modal Web Endpoints**
     - **Objective:** Build synchronous Modal endpoints for `embed`, `stt`, `tts`, and `infer` using the specified GPU/runtime settings.
@@ -42,10 +43,10 @@ This plan fully replaces RunPod with Modal across infrastructure, application co
       - `infer_uses_lora_when_adapter_exists`
     - **Steps:**
         1. Write failing contract tests for each endpoint payload and response shape.
-      2. Implement each endpoint in `modal/app.py` with the specified dependencies and explicit warm-window settings: `infer=600`, `tts=120`, `stt=120`, `embed=30` for `scaledown_window`.
-      3. Ensure each endpoint decorator includes `secrets=[modal.Secret.from_name("digital-legacy-b2")]`.
-      4. Run tests and verify all contract expectations pass.
-      5. Deploy with `modal deploy modal/app.py`, capture the four printed endpoint URLs, and set `.env.local` and Vercel env vars: `MODAL_EMBED_URL`, `MODAL_STT_URL`, `MODAL_TTS_URL`, `MODAL_INFER_URL` before starting Phase 4.
+        2. Implement each endpoint in `modal/app.py` with the specified dependencies and explicit warm-window settings: `infer=600`, `tts=120`, `stt=120`, `embed=30` for `scaledown_window`.
+        3. Ensure each endpoint decorator includes `secrets=[modal.Secret.from_name("digital-legacy-b2")]`.
+        4. Run tests and verify all contract expectations pass.
+        5. Deploy with `modal deploy modal/app.py`, capture the four printed endpoint URLs, and set `.env.local` and Vercel env vars: `MODAL_EMBED_URL`, `MODAL_STT_URL`, `MODAL_TTS_URL`, `MODAL_INFER_URL` before starting Phase 4.
 
 4. **Phase 4: Replace RunPod TypeScript Client with Modal Client**
     - **Objective:** Remove RunPod polling and endpoint-ID patterns, replacing them with direct synchronous Modal URL calls.
@@ -102,6 +103,7 @@ This plan fully replaces RunPod with Modal across infrastructure, application co
         4. Update architecture docs and run the updated test scripts.
 
 **Open Questions (resolved by user)**
+
 1. RunPod fallback retention: resolved as delete all RunPod code.
 2. Namespace strategy: resolved as direct replacement and migration to `src/lib/ai`.
 3. Vercel environment guidance: resolved as explicit named env setup in `README.md`.
