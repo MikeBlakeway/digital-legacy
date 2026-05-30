@@ -195,12 +195,14 @@ All AI inference runs as Modal web endpoints. Each endpoint is a Python function
 
 | Endpoint | Model | Hardware | Notes |
 |---|---|---|---|
-| `/infer` | Llama 3.1 8B + LoRA adapter | RTX 4090 | vLLM serving; persona adapter loaded at startup |
-| `/tts` | XTTS v2 | RTX 3090 / 4090 | Cloned voice; speaker reference loaded from B2 |
-| `/stt` | faster-whisper (large-v3) | RTX 3090 | Audio transcription |
-| `/embed` | nomic-embed-text | RTX 3090 | Text → vector for pgvector ingestion |
+| `/infer` | Llama 3.1 8B + LoRA adapter | A10G | vLLM serving; persona adapter loaded at startup |
+| `/tts` | XTTS v2 | A10G | Cloned voice; speaker reference loaded from B2 |
+| `/stt` | faster-whisper (large-v3) | T4 | Audio transcription |
+| `/embed` | nomic-embed-text | T4 | Text → vector for pgvector ingestion |
 
-**Model weights** are stored on a **Modal Volume** for fast loading. B2 is the backup/source-of-truth for weights; the Modal Volume is operational working storage.
+**Model weights** are stored at `/model-weights/` on a **Modal Volume** for fast loading. B2 is the backup/source-of-truth for weights; the Modal Volume is operational working storage.
+
+**Serving pattern** uses Modal web endpoints exposed via the `fastapi_endpoint` decorator.
 
 **Fine-tuning** is a separate on-demand GPU job, triggered manually. Uses Unsloth + QLoRA on an RTX 4090 or A100. Output adapter is saved to B2 and copied to the Modal Volume.
 
@@ -229,11 +231,11 @@ Browser
         │     └── pgvector (memory embeddings)
         ├── Backblaze B2 (media, voice, weights archive)
         │     └── Pre-signed URLs only — client uploads/downloads directly
-        └── Modal Web Endpoints
-              ├── /infer  (LLM + LoRA)
-              ├── /tts    (XTTS v2)
-              ├── /stt    (Whisper)
-              └── /embed  (nomic-embed-text)
+          └── Modal Serverless
+            ├── https://<modal-app>--infer.modal.run  (LLM + LoRA)
+            ├── https://<modal-app>--tts.modal.run    (XTTS v2)
+            ├── https://<modal-app>--stt.modal.run    (Whisper)
+            └── https://<modal-app>--embed.modal.run  (nomic-embed-text)
                     └── Modal Volume (operational model weights)
 ```
 
@@ -409,6 +411,7 @@ This is the most critical API route. It orchestrates the full RAG + inference pi
 ### 7.3 Modal Endpoint Contracts
 
 **`POST /infer`**
+
 ```json
 {
   "system_prompt": "string",
@@ -641,6 +644,7 @@ HF_TOKEN=
 
 | Decision | Rationale | Alternatives considered |
 |---|---|---|
+| Modal over RunPod for AI inference | RunPod experienced persistent GPU availability issues in EU regions and network volume incompatibility with serverless workers. Modal provides reliable serverless GPU with volume support, faster cold starts, and better developer experience. | RunPod (rejected: availability/reliability); Lambda Labs (viable alternative); local Mac mini (viable alternative) |
 | Modal web endpoints over self-hosted GPU | Deployable without dedicated hardware; pay-per-use suitable for low-traffic app; no hardware maintenance | Local GPU (rejected: not portable); cloud GPU via AWS/GCP (rejected: cost) |
 | Backblaze B2 over S3 | ~75% cheaper than S3; S3-compatible API; free egress to Cloudflare | AWS S3 (rejected: cost); Cloudflare R2 (viable alternative) |
 | Supabase pgvector over dedicated vector DB | Eliminates separate service; co-located with structured data; sufficient for <100k memories | Qdrant (rejected: extra service); ChromaDB (rejected: not production-ready) |

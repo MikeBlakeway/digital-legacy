@@ -16,7 +16,7 @@ export interface RunPodCallOptions {
   timeoutMs?: number;
 }
 
-export interface RunPodErrorContext {
+export interface ModalErrorContext {
   endpointUrl?: string;
   responseStatus?: number;
   details?: unknown;
@@ -29,14 +29,14 @@ const ENDPOINT_URL_ENV_BY_NAME: Record<RunPodEndpointName, string> = {
   embed: "MODAL_EMBED_URL",
 };
 
-export class RunPodError extends Error {
+export class ModalError extends Error {
   readonly endpointUrl?: string;
   readonly responseStatus?: number;
   readonly details?: unknown;
 
-  constructor(message: string, context: RunPodErrorContext = {}) {
+  constructor(message: string, context: ModalErrorContext = {}) {
     super(message);
-    this.name = "RunPodError";
+    this.name = "ModalError";
     this.endpointUrl = context.endpointUrl;
     this.responseStatus = context.responseStatus;
     this.details = context.details;
@@ -88,7 +88,7 @@ export async function callModalEndpoint<TInput, TOutput>({
     const responseBody = await readJsonResponse(response, endpointUrl);
 
     if (!response.ok) {
-      throw new RunPodError(`Modal request failed with HTTP ${response.status}.`, {
+      throw new ModalError(`Modal request failed with HTTP ${response.status}.`, {
         endpointUrl,
         responseStatus: response.status,
         details: responseBody,
@@ -96,7 +96,7 @@ export async function callModalEndpoint<TInput, TOutput>({
     }
 
     if (!isRecord(responseBody)) {
-      throw new RunPodError("Modal response was not a JSON object.", {
+      throw new ModalError("Modal response was not a JSON object.", {
         endpointUrl,
         details: responseBody,
       });
@@ -104,17 +104,17 @@ export async function callModalEndpoint<TInput, TOutput>({
 
     return responseBody as TOutput;
   } catch (error) {
-    if (error instanceof RunPodError) {
+    if (error instanceof ModalError) {
       throw error;
     }
 
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new RunPodError(`Modal request timed out after ${timeoutMs}ms.`, {
+      throw new ModalError(`Modal request timed out after ${timeoutMs}ms.`, {
         endpointUrl,
       });
     }
 
-    throw new RunPodError("Modal request failed before receiving a response.", {
+    throw new ModalError("Modal request failed before receiving a response.", {
       endpointUrl,
       details: error,
     });
@@ -139,7 +139,7 @@ async function readJsonResponse(response: Response, endpointUrl: string): Promis
   try {
     return await response.json();
   } catch (error) {
-    throw new RunPodError("Modal response was not valid JSON.", {
+    throw new ModalError("Modal response was not valid JSON.", {
       endpointUrl,
       responseStatus: response.status,
       details: error,

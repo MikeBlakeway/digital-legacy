@@ -1,7 +1,5 @@
 import modal
 
-from download_models_impl import download_models_impl
-
 
 def require_non_empty_string(item: dict, key: str) -> str:
     value = item.get(key)
@@ -74,15 +72,27 @@ base_image = (
     .pip_install(["huggingface_hub", "boto3", "fastapi[standard]"])
 )
 
+cuda12_library_path = (
+    "/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib:"
+    "/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib:"
+    "/usr/local/nvidia/lib64:"
+    "/usr/local/cuda/lib64"
+)
+
 embed_image = base_image.pip_install([
+    "einops",
     "sentence-transformers",
     "torch",
 ])
 
-stt_image = base_image.pip_install([
-    "faster-whisper",
-    "torch",
-])
+stt_image = (
+    base_image.pip_install([
+        "faster-whisper",
+        "nvidia-cublas-cu12",
+        "nvidia-cudnn-cu12",
+    ])
+    .env({"LD_LIBRARY_PATH": cuda12_library_path})
+)
 
 tts_image = base_image.pip_install([
     "TTS",
@@ -118,16 +128,59 @@ def download_models() -> None:
     def write_text(path: str, content: str) -> None:
         Path(path).write_text(content, encoding="utf-8")
 
-    download_models_impl(
-        snapshot_download=snapshot_download,
-        path_exists=os.path.exists,
-        list_dir=os.listdir,
-        make_dirs=os.makedirs,
-        write_text=write_text,
-        commit=volume.commit,
-        base_path="/model-weights",
-        hf_token=os.environ.get("HF_TOKEN"),
-    )
+    base_path = "/model-weights"
+    hf_token = os.environ.get("HF_TOKEN")
+    models = [
+        {
+            "repo_id": "meta-llama/Llama-3.1-8B-Instruct",
+            "local_dir": f"{base_path}/llama-3.1-8b-instruct",
+            "token": hf_token,
+            "token_required": True,
+        },
+        {
+            "repo_id": "coqui/XTTS-v2",
+            "local_dir": f"{base_path}/xtts-v2",
+            "token": None,
+            "token_required": False,
+        },
+        {
+            "repo_id": "Systran/faster-whisper-large-v3",
+            "local_dir": f"{base_path}/faster-whisper-large-v3",
+            "token": None,
+            "token_required": False,
+        },
+        {
+            "repo_id": "nomic-ai/nomic-embed-text-v1.5",
+            "local_dir": f"{base_path}/nomic-embed-text",
+            "token": None,
+            "token_required": False,
+        },
+    ]
+
+    if not hf_token:
+        raise ValueError("HF_TOKEN is required for gated model downloads.")
+
+    for model in models:
+        local_dir = model["local_dir"]
+        marker_path = f"{local_dir}/.download-complete"
+
+        if os.path.exists(local_dir) and os.path.exists(marker_path):
+            print(f"[SKIP] {model['repo_id']}")
+            continue
+
+        print(f"[DOWNLOADING] {model['repo_id']}")
+        snapshot_download(
+            repo_id=model["repo_id"],
+            local_dir=local_dir,
+            token=model["token"],
+        )
+        write_text(marker_path, "ok\n")
+        volume.commit()
+        print(f"[DONE] {model['repo_id']}")
+
+    os.makedirs(f"{base_path}/adapters", exist_ok=True)
+    volume.commit()
+    print("Download complete.")
 
 
 @app.function(
@@ -209,8 +262,10 @@ def tts(item: dict) -> dict:
     import base64
     import os
     import tempfile
+    import wave
 
     import boto3
+    from fastapi import HTTPException
     from TTS.api import TTS as CoquiTTS
 
     text = require_non_empty_string(item, "text")
@@ -222,6 +277,11 @@ def tts(item: dict) -> dict:
         not isinstance(speaker_b2_key, str) or not speaker_b2_key.strip()
     ):
         raise ValueError("speaker_wav_b2_key must be null or a non-empty string")
+    if speaker_b2_key is None:
+        raise HTTPException(
+            status_code=400,
+            detail="speaker_wav_b2_key is required until a default voice sample is configured.",
+        )
 
     speaker_path = None
     if speaker_b2_key:
@@ -235,7 +295,10 @@ def tts(item: dict) -> dict:
             speaker_path = temp_file.name
             s3.download_fileobj(os.environ["B2_BUCKET_NAME"], speaker_b2_key.strip(), temp_file)
 
-    model = CoquiTTS("tts_models/multilingual/multi-dataset/xtts_v2")
+    model = CoquiTTS(
+        model_path="/model-weights/xtts-v2/model.pth",
+        config_path="/model-weights/xtts-v2/config.json",
+    )
     model.to("cuda")
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as output_file:
@@ -251,13 +314,15 @@ def tts(item: dict) -> dict:
 
         with open(output_path, "rb") as output_file:
             audio_b64 = base64.b64encode(output_file.read()).decode()
+        with wave.open(output_path, "rb") as wav_file:
+            duration_seconds = wav_file.getnframes() / float(wav_file.getframerate())
     finally:
         if os.path.exists(output_path):
             os.unlink(output_path)
         if speaker_path and os.path.exists(speaker_path):
             os.unlink(speaker_path)
 
-    return {"audio_base64": audio_b64}
+    return {"audio_base64": audio_b64, "duration_seconds": duration_seconds}
 
 
 @app.function(
@@ -274,6 +339,8 @@ def tts(item: dict) -> dict:
 @modal.fastapi_endpoint(method="POST")
 def infer(item: dict) -> dict:
     import os
+
+    os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")
 
     from vllm import LLM, SamplingParams
     from vllm.lora.request import LoRARequest

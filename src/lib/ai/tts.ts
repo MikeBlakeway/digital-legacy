@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  RunPodError,
+  ModalError,
   callRunPodEndpoint,
   isRecord,
   type RunPodCallOptions,
@@ -29,7 +29,7 @@ export async function synthesizeSpeech(
     typeof output.audio_base64 !== "string" ||
     typeof output.duration_seconds !== "number"
   ) {
-    throw new RunPodError("TTS endpoint returned an invalid output payload.", {
+    throw new ModalError("TTS endpoint returned an invalid output payload.", {
       details: output,
     });
   }

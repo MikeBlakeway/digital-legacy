@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  RunPodError,
+  ModalError,
   getModalEndpointUrl,
   isRecord,
   type RunPodCallOptions,
@@ -51,7 +51,7 @@ export async function inferPersona(
   const responseBody = await readJsonResponse(response, endpointUrl);
 
   if (!response.ok) {
-    throw new RunPodError(`Modal infer request failed with HTTP ${response.status}.`, {
+    throw new ModalError(`Modal infer request failed with HTTP ${response.status}.`, {
       endpointUrl,
       responseStatus: response.status,
       details: responseBody,
@@ -70,7 +70,7 @@ export async function inferText(
 
 function parseInferOutput(output: unknown, endpointUrl: string): InferOutput {
   if (!isRecord(output) || typeof output.text !== "string") {
-    throw new RunPodError("Infer endpoint returned an invalid output payload.", {
+    throw new ModalError("Infer endpoint returned an invalid output payload.", {
       endpointUrl,
       details: output,
     });
@@ -83,7 +83,7 @@ async function readJsonResponse(response: Response, endpointUrl: string): Promis
   try {
     return await response.json();
   } catch (error) {
-    throw new RunPodError("Modal infer response was not valid JSON.", {
+    throw new ModalError("Modal infer response was not valid JSON.", {
       endpointUrl,
       responseStatus: response.status,
       details: error,

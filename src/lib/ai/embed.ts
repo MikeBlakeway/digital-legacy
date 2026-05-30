@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  RunPodError,
+  ModalError,
   callRunPodEndpoint,
   isRecord,
   type RunPodCallOptions,
@@ -34,13 +34,13 @@ export async function embedTexts(
   );
 
   if (!isRecord(output) || !isEmbeddingMatrix(output.embeddings)) {
-    throw new RunPodError("Embed endpoint returned an invalid output payload.", {
+    throw new ModalError("Embed endpoint returned an invalid output payload.", {
       details: output,
     });
   }
 
   if (output.embeddings.length !== texts.length) {
-    throw new RunPodError("Embed endpoint returned a mismatched embedding count.", {
+    throw new ModalError("Embed endpoint returned a mismatched embedding count.", {
       details: output,
     });
   }
@@ -55,7 +55,7 @@ export async function embedText(
   const [embedding] = await embedTexts([text], options);
 
   if (!embedding) {
-    throw new RunPodError("Embed endpoint did not return an embedding.", {
+    throw new ModalError("Embed endpoint did not return an embedding.", {
       details: { text },
     });
   }

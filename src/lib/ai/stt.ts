@@ -1,7 +1,7 @@
 import "server-only";
 
 import {
-  RunPodError,
+  ModalError,
   callRunPodEndpoint,
   isRecord,
   type RunPodCallOptions,
@@ -28,7 +28,7 @@ export async function transcribeAudio(
     typeof output.transcript !== "string" ||
     typeof output.duration_seconds !== "number"
   ) {
-    throw new RunPodError("STT endpoint returned an invalid output payload.", {
+    throw new ModalError("STT endpoint returned an invalid output payload.", {
       details: output,
     });
   }
