@@ -1,7 +1,7 @@
 # Digital Legacy — Architecture & Requirements
 
 > **Working title:** Digital Legacy
-> **Status:** Active development — Modal migration and implementation in progress
+> **Status:** Active development — Phase 2 feature build in progress
 > **Author:** Mike Blakeway
 > **Purpose:** Primary reference document for AI coding agents and developer context. All implementation decisions should be traceable to this document.
 
@@ -164,7 +164,7 @@ Cold start latency (Modal web endpoints worker spin-up) is acknowledged and acce
 
 | Component | Technology | Rationale |
 |---|---|---|
-| Framework | Next.js 14+ (App Router) | Established stack; SSR for auth-protected routes; API routes for backend logic |
+| Framework | Next.js 16.2.6 (App Router) | Established stack; SSR for auth-protected routes; API routes for backend logic |
 | Language | TypeScript | Type safety for complex data models |
 | Styling | Tailwind CSS | Consistent with existing projects |
 | Hosting | Vercel | Zero-config deployment; free tier sufficient |
@@ -195,8 +195,9 @@ All AI inference runs as Modal web endpoints. Each endpoint is a Python function
 
 | Endpoint | Model | Hardware | Notes |
 |---|---|---|---|
-| `/infer` | Llama 3.1 8B + LoRA adapter | A10G | vLLM serving; persona adapter loaded at startup |
-| `/tts` | XTTS v2 | A10G | Cloned voice; speaker reference loaded from B2 |
+| `/infer` | Llama 3.1 8B + LoRA adapter | A10G | vLLM serving; persona adapter loaded at startup. Used in two modes: persona (responds *as* the subject) and interviewer (structured interview agent, no LoRA, no memory access) |
+| `/analyse` | Llama 3.1 8B (no LoRA) | A10G | Long-context analytical inference; temperature 0.2; vLLM guided decoding (forced JSON). Two tasks: `trait_inference` (Big Five + narrative signals + values from corpus) and `emotion_classify` (emotional register of a response text) |
+| `/tts` | XTTS v2 | A10G | Cloned voice; accepts `speaker_wav_b2_key` (neutral reference) and optional `emotion_b2_key` (emotional prosody reference) |
 | `/stt` | faster-whisper (large-v3) | T4 | Audio transcription |
 | `/embed` | nomic-embed-text | T4 | Text → vector for pgvector ingestion |
 
@@ -253,11 +254,16 @@ id               uuid PK
 name             text
 slug             text unique         -- used in routes e.g. /persona/mike
 owner_user_id    uuid FK → auth.users
+birth_year       integer nullable
+birth_place      text nullable
+locations_lived  text[] nullable     -- ordered, most recent last
 lora_adapter_key text                -- B2 path to current adapter
-voice_sample_key text                -- B2 path to voice reference file
+voice_sample_key text                -- B2 path to neutral voice reference file
 created_at       timestamptz
 updated_at       timestamptz
 ```
+
+> Note: there is no `identity_prompt` or self-description field. Personality is derived by the `/analyse` endpoint from diary entries and interview responses, not declared by the subject. The only subject-authored content that feeds directly into the system prompt as factual grounding is the biographical fields above.
 
 **`memories`**
 Atomic units of knowledge about a persona. Everything the model can retrieve goes through this table.
@@ -336,6 +342,72 @@ granted_at       timestamptz
 PRIMARY KEY (persona_id, user_id)
 ```
 
+**`diary_entries`**
+Raw diary entries — text, voice, or both. Feeds the trait inference pipeline and produces memories for RAG.
+
+```
+id               uuid PK
+persona_id       uuid FK → personas
+content          text nullable       -- null if voice-only entry not yet transcribed
+voice_b2_key     text nullable       -- original audio
+transcript       text nullable       -- Whisper transcript
+emotion_label    text               -- one of 8 labels, set at capture time
+emotion_updates  jsonb              -- [{timestamp_seconds: float, emotion_label: text}]
+word_count       integer
+processed_at     timestamptz        -- when trait inference last ran over this entry
+created_at       timestamptz
+```
+
+**`interview_sessions`**
+Conversational interview sessions with the AI interviewer agent.
+
+```
+id               uuid PK
+persona_id       uuid FK → personas
+theme            text               -- 'values' | 'relationships' | 'fears' | 'life_stories' | 'formative'
+messages         jsonb              -- [{role: 'agent'|'subject', content: text, emotion_label: text|null}]
+turn_count       integer
+completed_at     timestamptz nullable
+created_at       timestamptz
+```
+
+**`persona_traits`**
+Versioned inferred personality profile. Computed by the `/analyse` endpoint from diary and interview content.
+
+```
+id                       uuid PK
+persona_id               uuid FK → personas
+version                  integer
+openness                 float       -- Big Five (0.0–1.0)
+conscientiousness        float
+extraversion             float
+agreeableness            float
+neuroticism              float
+narrative_agency         float       -- McAdams narrative signals (0.0–1.0)
+narrative_communion      float
+narrative_redemption     float
+dominant_values          text[]      -- top 3–5 Schwartz value labels
+summary_prose            text        -- human-readable summary (shown to subject)
+identity_block           text        -- generated system prompt identity block (used in inference)
+diary_entries_analysed   integer
+interview_turns_analysed integer
+computed_at              timestamptz
+is_current               boolean     -- unique index enforces one current row per persona
+```
+
+**`emotional_voice_samples`**
+Per-subject library of labelled voice clips for emotional TTS synthesis. Populated from diary, interview, and dedicated voice recording sessions.
+
+```
+id               uuid PK
+persona_id       uuid FK → personas
+emotion_label    text               -- one of 8 labels
+b2_key           text               -- B2 path to the audio clip
+duration_seconds float
+quality_score    float nullable     -- SNR/clarity metric
+created_at       timestamptz
+```
+
 ### 6.2 Row-Level Security Summary
 
 - `personas`: owner can read/write; family members with access can read
@@ -344,6 +416,10 @@ PRIMARY KEY (persona_id, user_id)
 - `conversations`: user can read/write their own only
 - `messages`: user can read/write their own only
 - `persona_access`: admin only can insert/delete
+- `diary_entries`: owner read/write only
+- `interview_sessions`: owner read/write only
+- `persona_traits`: owner read only; writes via service role only (computed by inference pipeline)
+- `emotional_voice_samples`: owner read/write only
 
 ---
 
@@ -457,14 +533,15 @@ Response: `{ "transcript": "string", "duration_seconds": 0.0 }`
 
 Response: `{ "embeddings": [[0.0, ...]] }`
 
-The system prompt is constructed at inference time and has three parts:
+The system prompt is constructed at inference time by `lib/persona-prompt.ts` and has three parts:
 
-**1. Static identity block** (stored in `personas`, written by subject)
+**1. Identity block**
 
-```
-You are [name]. You were born in [year] and lived in [places].
-You are speaking to members of your family after your death.
-```
+If a current `persona_traits` row exists: use `persona_traits.identity_block` — a first-person personality description generated by the `/analyse` endpoint from the subject's diary and interview content. Example: *"You are someone who approaches the world with a high degree of curiosity and openness. You form deep, loyal relationships and feel things intensely..."*
+
+If no traits have been computed yet: fall back to a minimal biographical block derived from `persona.name`, `persona.birth_year`, `persona.birth_place`, and `persona.locations_lived`.
+
+The subject never writes their own identity description. Personality is always inferred from authentic expression.
 
 **2. Injected memory block** (retrieved per-query from pgvector)
 
@@ -476,8 +553,16 @@ Here are some things you remember that are relevant to this conversation:
 ...
 ```
 
-**3. Conversation history** (from `messages` for current session)
-Standard `[{role, content}]` array appended as prior turns.
+Omitted entirely if no memories are retrieved. Only memories with `is_private = false` are eligible.
+
+**3. Closing instruction**
+
+```
+You are speaking to members of your family. Speak in first person, in your natural voice.
+Keep responses personal and human. Do not refer to yourself as an AI.
+```
+
+Conversation history from `messages` is appended as prior turns in the standard `[{role, content}]` format.
 
 ---
 
@@ -540,6 +625,7 @@ B2_REGION=us-west-004
 
 # Modal
 MODAL_INFER_URL=
+MODAL_ANALYSE_URL=
 MODAL_TTS_URL=
 MODAL_STT_URL=
 MODAL_EMBED_URL=
@@ -655,4 +741,4 @@ HF_TOKEN=
 
 ---
 
-*Last updated: May 2026*
+*Last updated: June 2026*

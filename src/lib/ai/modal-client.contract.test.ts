@@ -148,10 +148,60 @@ async function wrapper_modules_preserve_contract_shapes() {
   }
 }
 
+async function tts_accepts_emotional_reference_without_serializing_undefined() {
+  const capturedBodies: string[] = [];
+  const fetchFn: RunPodFetch = async (_input, init) => {
+    capturedBodies.push(String(init?.body ?? ""));
+
+    return new Response(JSON.stringify({ audio_base64: "Zm9v", duration_seconds: 1.11 }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  await synthesizeSpeech(
+    {
+      text: "hello",
+      speaker_wav_b2_key: "voice-samples/persona/neutral.wav",
+      language: "en",
+      emotion_b2_key: "voice-samples/persona/warm.wav",
+    },
+    {
+      endpointUrl: "https://example.modal.run/tts",
+      fetchFn,
+    },
+  );
+
+  await synthesizeSpeech(
+    {
+      text: "hello",
+      speaker_wav_b2_key: "voice-samples/persona/neutral.wav",
+      language: "en",
+      emotion_b2_key: undefined,
+    },
+    {
+      endpointUrl: "https://example.modal.run/tts",
+      fetchFn,
+    },
+  );
+
+  const withEmotion = JSON.parse(capturedBodies[0] ?? "{}") as Record<string, unknown>;
+  const withoutEmotion = JSON.parse(capturedBodies[1] ?? "{}") as Record<string, unknown>;
+
+  if (withEmotion.emotion_b2_key !== "voice-samples/persona/warm.wav") {
+    throw new Error("Expected TTS wrapper to forward emotion_b2_key when present.");
+  }
+
+  if ("emotion_b2_key" in withoutEmotion) {
+    throw new Error("Expected TTS wrapper to omit emotion_b2_key when undefined.");
+  }
+}
+
 async function run() {
   await client_posts_to_modal_url_with_json();
   await infer_uses_abortsignal_timeout_590_seconds();
   await wrapper_modules_preserve_contract_shapes();
+  await tts_accepts_emotional_reference_without_serializing_undefined();
 }
 
 void run();

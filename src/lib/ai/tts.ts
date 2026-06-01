@@ -11,6 +11,7 @@ export interface TtsInput {
   text: string;
   speaker_wav_b2_key: string | null;
   language?: string;
+  emotion_b2_key?: string;
 }
 
 export interface TtsOutput {
