@@ -9,16 +9,16 @@ import {
 
 const DEFAULT_EXPIRES_IN_SECONDS = 15 * 60;
 const CONTENT_TYPES = ["audio/webm", "audio/webm;codecs=opus"] as const;
-const KEY_PREFIXES = ["voice-samples", "diary"] as const;
+const KEY_PREFIXES = ["voice-samples", "diary", "interview"] as const;
 
 type ContentType = (typeof CONTENT_TYPES)[number];
-type KeyPrefix = (typeof KEY_PREFIXES)[number];
+export type VoiceSampleUploadKeyPrefix = (typeof KEY_PREFIXES)[number];
 
 type UploadRequest = {
   persona_slug: string;
   content_type: ContentType;
   content_length?: number;
-  key_prefix?: KeyPrefix;
+  key_prefix?: VoiceSampleUploadKeyPrefix;
 };
 
 export async function POST(request: NextRequest) {
@@ -103,8 +103,8 @@ async function parseRequest(
     fields.content_length = "Content length must be a positive integer.";
   }
 
-  if (keyPrefix !== undefined && !isKeyPrefix(keyPrefix)) {
-    fields.key_prefix = "Key prefix must be voice-samples or diary.";
+  if (keyPrefix !== undefined && !isVoiceSampleUploadKeyPrefix(keyPrefix)) {
+    fields.key_prefix = "Key prefix must be voice-samples, diary, or interview.";
   }
 
   if (Object.keys(fields).length > 0) {
@@ -115,7 +115,7 @@ async function parseRequest(
     persona_slug: personaSlug,
     content_type: contentType as ContentType,
     ...(typeof contentLength === "number" ? { content_length: contentLength } : {}),
-    ...(isKeyPrefix(keyPrefix) ? { key_prefix: keyPrefix } : {}),
+    ...(isVoiceSampleUploadKeyPrefix(keyPrefix) ? { key_prefix: keyPrefix } : {}),
   };
 }
 
@@ -123,7 +123,9 @@ function isContentType(value: unknown): value is ContentType {
   return CONTENT_TYPES.some((contentType) => contentType === value);
 }
 
-function isKeyPrefix(value: unknown): value is KeyPrefix {
+export function isVoiceSampleUploadKeyPrefix(
+  value: unknown,
+): value is VoiceSampleUploadKeyPrefix {
   return KEY_PREFIXES.some((keyPrefix) => keyPrefix === value);
 }
 

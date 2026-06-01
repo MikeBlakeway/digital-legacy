@@ -7,16 +7,21 @@ import type { EmotionUpdate } from "@/lib/supabase/diary";
 import EmotionSelector from "@/components/capture/diary/EmotionSelector";
 
 type RecordingState = "idle" | "recording" | "paused" | "stopped";
+type VoiceUploadKeyPrefix = "diary" | "interview";
 
 export type RecordingCompletePayload = {
   voice_b2_key: string;
   duration_seconds: number;
   emotion_updates: EmotionUpdate[];
+  emotion_label?: EmotionLabel;
 };
 
 type DiaryVoiceRecorderProps = {
   personaSlug: string;
-  initialEmotion: EmotionLabel;
+  initialEmotion: EmotionLabel | null;
+  uploadKeyPrefix?: VoiceUploadKeyPrefix;
+  microphoneErrorMessage?: string;
+  readyMessage?: string;
   onRecordingComplete: (payload: RecordingCompletePayload) => void;
 };
 
@@ -28,11 +33,16 @@ type UploadResponse = {
 export default function DiaryVoiceRecorder({
   personaSlug,
   initialEmotion,
+  uploadKeyPrefix = "diary",
+  microphoneErrorMessage = "Microphone access is required to record a diary entry.",
+  readyMessage = "Recording ready to save.",
   onRecordingComplete,
 }: DiaryVoiceRecorderProps) {
   const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [durationSeconds, setDurationSeconds] = useState(0);
-  const [currentEmotion, setCurrentEmotion] = useState<EmotionLabel>(initialEmotion);
+  const [currentEmotion, setCurrentEmotion] = useState<EmotionLabel | null>(
+    initialEmotion,
+  );
   const [showEmotionSelector, setShowEmotionSelector] = useState(false);
   const [emotionUpdates, setEmotionUpdates] = useState<EmotionUpdate[]>([]);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -46,6 +56,7 @@ export default function DiaryVoiceRecorder({
   const chunksRef = useRef<BlobPart[]>([]);
   const durationRef = useRef(0);
   const emotionUpdatesRef = useRef<EmotionUpdate[]>([]);
+  const currentEmotionRef = useRef<EmotionLabel | null>(initialEmotion);
 
   function stopStream() {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -71,6 +82,10 @@ export default function DiaryVoiceRecorder({
   useEffect(() => {
     emotionUpdatesRef.current = emotionUpdates;
   }, [emotionUpdates]);
+
+  useEffect(() => {
+    currentEmotionRef.current = currentEmotion;
+  }, [currentEmotion]);
 
   useEffect(() => {
     return () => {
@@ -120,7 +135,7 @@ export default function DiaryVoiceRecorder({
       recorder.start();
       setRecordingState("recording");
     } catch {
-      setErrorMessage("Microphone access is required to record a diary entry.");
+      setErrorMessage(microphoneErrorMessage);
       setRecordingState("idle");
     }
   }
@@ -166,7 +181,7 @@ export default function DiaryVoiceRecorder({
           persona_slug: personaSlug,
           content_type: contentType,
           content_length: blob.size,
-          key_prefix: "diary",
+          key_prefix: uploadKeyPrefix,
         }),
       });
       const uploadPayload: unknown = await uploadResponse.json().catch(() => null);
@@ -192,6 +207,9 @@ export default function DiaryVoiceRecorder({
         voice_b2_key: uploadPayload.b2_key,
         duration_seconds: duration,
         emotion_updates: emotionUpdatesRef.current,
+        ...(currentEmotionRef.current
+          ? { emotion_label: currentEmotionRef.current }
+          : {}),
       });
     } catch {
       setUploadState("error");
@@ -207,7 +225,7 @@ export default function DiaryVoiceRecorder({
           onClick={() => setShowEmotionSelector((current) => !current)}
           className="rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-700 hover:bg-stone-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
-          Current emotion: {currentEmotion}
+          Current emotion: {currentEmotion ?? "Not tagged"}
         </button>
         <span className="font-mono text-sm text-stone-600 dark:text-zinc-300">
           {formatDuration(durationSeconds)}
@@ -275,7 +293,7 @@ export default function DiaryVoiceRecorder({
       ) : null}
       {uploadState === "done" ? (
         <p className="text-sm text-stone-600 dark:text-zinc-300">
-          Recording ready to save.
+          {readyMessage}
         </p>
       ) : null}
       {errorMessage ? (
