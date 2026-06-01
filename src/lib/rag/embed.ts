@@ -9,7 +9,12 @@ import {
 } from "@/lib/ai/embed";
 import type { RunPodCallOptions } from "@/lib/ai/client";
 
-export type MemorySource = "interview" | "voice_memo" | "free_text" | "media_caption";
+export type MemorySource =
+  | "interview"
+  | "voice_memo"
+  | "free_text"
+  | "media_caption"
+  | "diary";
 
 export interface MemoryRecord {
   id: string;
@@ -139,6 +144,7 @@ function isMemorySource(value: unknown): value is MemorySource {
     value === "interview" ||
     value === "voice_memo" ||
     value === "free_text" ||
-    value === "media_caption"
+    value === "media_caption" ||
+    value === "diary"
   );
 }

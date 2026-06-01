@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { getPersonaBySlug } from "@/lib/supabase/personas";
@@ -14,7 +15,7 @@ type CaptureDashboardPageProps = {
   }>;
 };
 
-const CAPTURE_SECTIONS = ["Diary", "Interviews", "Voice", "Photos"] as const;
+const CAPTURE_SECTIONS = ["Interviews", "Voice", "Photos"] as const;
 
 export default async function CaptureDashboardPage({
   params,
@@ -47,6 +48,12 @@ export default async function CaptureDashboardPage({
         </div>
 
         <nav aria-label="Capture sections" className="grid gap-3 sm:grid-cols-4">
+          <Link
+            href={`/capture/${persona.slug}/diary`}
+            className="rounded-md border border-stone-200 bg-white px-4 py-4 text-left text-sm font-medium text-stone-800 shadow-sm transition hover:border-stone-400 hover:bg-stone-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
+          >
+            Diary
+          </Link>
           {CAPTURE_SECTIONS.map((section) => (
             <button
               key={section}

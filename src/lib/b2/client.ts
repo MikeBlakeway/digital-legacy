@@ -34,6 +34,10 @@ export interface CreatePresignedDownloadUrlParams {
   responseContentType?: string;
 }
 
+export interface ReadObjectAsBase64Params {
+  key: string;
+}
+
 export interface PresignedUrlOptions {
   client?: S3Client;
   bucketName?: string;
@@ -101,6 +105,36 @@ export async function createPresignedDownloadUrl(
   return getSignedUrl(options.client ?? getB2Client(), new GetObjectCommand(commandInput), {
     expiresIn: validateExpiry(params.expiresInSeconds),
   });
+}
+
+export async function readObjectAsBase64(
+  params: ReadObjectAsBase64Params,
+  options: PresignedUrlOptions = {},
+): Promise<string> {
+  const response = await (options.client ?? getB2Client()).send(
+    new GetObjectCommand({
+      Bucket: options.bucketName ?? getB2BucketName(),
+      Key: validateObjectKey(params.key),
+    }),
+  );
+
+  if (!hasByteArrayBody(response.Body)) {
+    throw new Error("B2 object response did not include a readable body.");
+  }
+
+  const bytes = await response.Body.transformToByteArray();
+  return Buffer.from(bytes).toString("base64");
+}
+
+function hasByteArrayBody(
+  value: unknown,
+): value is { transformToByteArray: () => Promise<Uint8Array> } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "transformToByteArray" in value &&
+    typeof value.transformToByteArray === "function"
+  );
 }
 
 function readRequiredEnv(env: NodeJS.ProcessEnv, name: string): string {
