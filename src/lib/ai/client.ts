@@ -2,7 +2,7 @@ import "server-only";
 
 export const DEFAULT_MODAL_TIMEOUT_MS = 120_000;
 
-export type RunPodEndpointName = "infer" | "tts" | "stt" | "embed";
+export type RunPodEndpointName = "infer" | "tts" | "stt" | "embed" | "analyse";
 
 export type RunPodFetch = (
   input: RequestInfo | URL,
@@ -27,6 +27,7 @@ const ENDPOINT_URL_ENV_BY_NAME: Record<RunPodEndpointName, string> = {
   tts: "MODAL_TTS_URL",
   stt: "MODAL_STT_URL",
   embed: "MODAL_EMBED_URL",
+  analyse: "MODAL_ANALYSE_URL",
 };
 
 export class ModalError extends Error {

@@ -1,7 +1,9 @@
 import {
+  ModalError,
   callRunPodEndpoint,
   type RunPodFetch,
 } from "@/lib/ai/client";
+import { classifyEmotion, inferTraits } from "@/lib/ai/analyse";
 import { embedTexts } from "@/lib/ai/embed";
 import { inferPersona } from "@/lib/ai/infer";
 import { transcribeAudio } from "@/lib/ai/stt";
@@ -197,11 +199,138 @@ async function tts_accepts_emotional_reference_without_serializing_undefined() {
   }
 }
 
+async function analyse_wrappers_post_task_input_and_unwrap_result() {
+  const capturedBodies: string[] = [];
+  const fetchFn: RunPodFetch = async (_input, init) => {
+    const body = String(init?.body ?? "");
+    capturedBodies.push(body);
+    const parsed = JSON.parse(body) as { task?: string };
+
+    if (parsed.task === "trait_inference") {
+      return new Response(
+        JSON.stringify({
+          result: {
+            openness: 0.7,
+            conscientiousness: 0.6,
+            extraversion: 0.5,
+            agreeableness: 0.8,
+            neuroticism: 0.2,
+            narrative_agency: 0.65,
+            narrative_communion: 0.75,
+            narrative_redemption: 0.55,
+            dominant_values: ["benevolence", "security", "self-direction"],
+            summary_prose: "Reflective and warm.",
+            identity_block: "I am reflective and warm.",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        result: {
+          emotion_label: "anxious",
+          intensity: 0.72,
+        },
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  };
+
+  const traits = await inferTraits("I try to do the right thing.", {
+    endpointUrl: "https://example.modal.run/analyse",
+    fetchFn,
+  });
+  const emotion = await classifyEmotion("Oh my goodness, is little Freddy okay?", {
+    endpointUrl: "https://example.modal.run/analyse",
+    fetchFn,
+  });
+
+  if (traits.identity_block !== "I am reflective and warm.") {
+    throw new Error("Expected inferTraits to unwrap the trait inference result.");
+  }
+
+  if (emotion.emotion_label !== "anxious" || emotion.intensity !== 0.72) {
+    throw new Error("Expected classifyEmotion to unwrap the emotion classification result.");
+  }
+
+  const traitRequest = JSON.parse(capturedBodies[0] ?? "{}") as Record<string, unknown>;
+  const emotionRequest = JSON.parse(capturedBodies[1] ?? "{}") as Record<string, unknown>;
+
+  if (
+    traitRequest.task !== "trait_inference" ||
+    traitRequest.input !== "I try to do the right thing."
+  ) {
+    throw new Error("Expected inferTraits to post the trait_inference task and input.");
+  }
+
+  if (
+    emotionRequest.task !== "emotion_classify" ||
+    emotionRequest.input !== "Oh my goodness, is little Freddy okay?"
+  ) {
+    throw new Error("Expected classifyEmotion to post the emotion_classify task and input.");
+  }
+}
+
+async function analyse_wrappers_throw_typed_errors_for_invalid_payloads() {
+  await assertRejectsWithModalError(
+    () =>
+      inferTraits("I try to do the right thing.", {
+        endpointUrl: "https://example.modal.run/analyse",
+        fetchFn: async () =>
+          new Response(JSON.stringify({ error: "parse_failed" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      }),
+    "parse model JSON",
+  );
+
+  await assertRejectsWithModalError(
+    () =>
+      classifyEmotion("Oh my goodness, is little Freddy okay?", {
+        endpointUrl: "https://example.modal.run/analyse",
+        fetchFn: async () =>
+          new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+      }),
+    "missing result",
+  );
+}
+
+async function assertRejectsWithModalError(
+  action: () => Promise<unknown>,
+  expectedMessage: string,
+) {
+  try {
+    await action();
+  } catch (error) {
+    if (!(error instanceof ModalError)) {
+      throw new Error("Expected a ModalError.");
+    }
+
+    if (!error.message.includes(expectedMessage)) {
+      throw new Error(
+        `Expected error message to include "${expectedMessage}", received "${error.message}".`,
+      );
+    }
+
+    return;
+  }
+
+  throw new Error("Expected action to reject with a ModalError.");
+}
+
 async function run() {
   await client_posts_to_modal_url_with_json();
   await infer_uses_abortsignal_timeout_590_seconds();
   await wrapper_modules_preserve_contract_shapes();
   await tts_accepts_emotional_reference_without_serializing_undefined();
+  await analyse_wrappers_post_task_input_and_unwrap_result();
+  await analyse_wrappers_throw_typed_errors_for_invalid_payloads();
 }
 
 void run();
