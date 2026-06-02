@@ -16,7 +16,7 @@ type CaptureDashboardPageProps = {
   }>;
 };
 
-const CAPTURE_SECTIONS = ["Voice", "Photos"] as const;
+const DISABLED_CAPTURE_SECTIONS = ["Voice"] as const;
 
 export default async function CaptureDashboardPage({
   params,
@@ -76,7 +76,13 @@ export default async function CaptureDashboardPage({
           >
             Interviews
           </Link>
-          {CAPTURE_SECTIONS.map((section) => (
+          <Link
+            href={`/capture/${persona.slug}/media`}
+            className="rounded-md border border-stone-200 bg-white px-4 py-4 text-left text-sm font-medium text-stone-800 shadow-sm transition hover:border-stone-400 hover:bg-stone-100 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
+          >
+            Photos
+          </Link>
+          {DISABLED_CAPTURE_SECTIONS.map((section) => (
             <button
               key={section}
               type="button"
