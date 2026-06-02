@@ -345,13 +345,17 @@ async function loadMediaAssets(
   client: ReturnType<typeof createServiceRoleClient>,
   memories: Array<{ media_asset_id: string | null }>
 ): Promise<ChatResponseMediaAsset[]> {
-  const mediaAssetIds = Array.from(
-    new Set(
-      memories.flatMap((memory) =>
-        memory.media_asset_id ? [memory.media_asset_id] : []
-      )
-    )
-  )
+  const mediaAssetIds: string[] = []
+  const seen = new Set<string>()
+
+  for (const memory of memories) {
+    if (!memory.media_asset_id || seen.has(memory.media_asset_id)) {
+      continue
+    }
+
+    seen.add(memory.media_asset_id)
+    mediaAssetIds.push(memory.media_asset_id)
+  }
 
   if (mediaAssetIds.length === 0) {
     return []
@@ -359,8 +363,9 @@ async function loadMediaAssets(
 
   const result = await client
     .from('media_assets')
-    .select('id, b2_key, caption')
+    .select('id, b2_key, caption, media_type')
     .in('id', mediaAssetIds)
+    .eq('media_type', 'photo')
     .not('caption', 'is', null)
 
   if (result.error) {
@@ -377,14 +382,44 @@ async function loadMediaAssets(
     return []
   }
 
-  const assets = rows.filter(isMediaAssetRow).map(async (row) => ({
-    id: row.id,
-    url: await createPresignedDownloadUrl({
-      key: row.b2_key,
-      expiresInSeconds: MEDIA_URL_EXPIRES_IN_SECONDS
-    }),
-    caption: row.caption
-  }))
+  const rowById = new Map<string, { b2_key: string; caption: string }>()
+
+  for (const row of rows) {
+    if (!isMediaAssetRow(row)) {
+      continue
+    }
+
+    rowById.set(row.id, {
+      b2_key: row.b2_key,
+      caption: row.caption
+    })
+  }
+
+  const assets = mediaAssetIds
+    .map((assetId) => {
+      const row = rowById.get(assetId)
+
+      if (!row) {
+        return null
+      }
+
+      return {
+        id: assetId,
+        b2Key: row.b2_key,
+        caption: row.caption
+      }
+    })
+    .filter((asset): asset is { id: string; b2Key: string; caption: string } =>
+      Boolean(asset)
+    )
+    .map(async (asset) => ({
+      id: asset.id,
+      url: await createPresignedDownloadUrl({
+        key: asset.b2Key,
+        expiresInSeconds: MEDIA_URL_EXPIRES_IN_SECONDS
+      }),
+      caption: asset.caption
+    }))
 
   return Promise.all(assets)
 }
@@ -523,14 +558,18 @@ function readUserId(claims: unknown): string | null {
   return claims.sub
 }
 
-function isMediaAssetRow(
-  value: unknown
-): value is { id: string; b2_key: string; caption: string } {
+function isMediaAssetRow(value: unknown): value is {
+  id: string
+  b2_key: string
+  caption: string
+  media_type: 'photo'
+} {
   return (
     isRecord(value) &&
     typeof value.id === 'string' &&
     typeof value.b2_key === 'string' &&
-    typeof value.caption === 'string'
+    typeof value.caption === 'string' &&
+    value.media_type === 'photo'
   )
 }
 
