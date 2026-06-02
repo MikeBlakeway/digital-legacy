@@ -109,6 +109,15 @@ infer_image = (
     ])
 )
 
+analyse_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install([
+        "vllm",
+        "huggingface_hub",
+        "fastapi[standard]",
+    ])
+)
+
 
 @app.function(
     image=base_image,
@@ -382,3 +391,237 @@ def infer(item: dict) -> dict:
     )
 
     return {"text": outputs[0].outputs[0].text.strip()}
+
+
+@app.function(
+    image=analyse_image,
+    gpu="A10G",
+    volumes={"/model-weights": volume},
+    secrets=[
+        modal.Secret.from_name("digital-legacy-b2"),
+        modal.Secret.from_name("huggingface"),
+    ],
+    timeout=600,
+    scaledown_window=600,
+)
+@modal.fastapi_endpoint(method="POST")
+def analyse(item: dict) -> dict:
+    import json
+    import os
+
+    os.environ.setdefault("VLLM_USE_FLASHINFER_SAMPLER", "0")
+
+    from vllm import LLM, SamplingParams
+
+    retry_instruction = "Your response must be valid JSON only. No preamble, no explanation."
+    emotion_labels = [
+        "warm",
+        "sad",
+        "frustrated",
+        "anxious",
+        "amused",
+        "tender",
+        "indignant",
+        "reflective",
+    ]
+    trait_schema = {
+        "type": "object",
+        "properties": {
+            "openness": {"type": "number", "minimum": 0, "maximum": 1},
+            "conscientiousness": {"type": "number", "minimum": 0, "maximum": 1},
+            "extraversion": {"type": "number", "minimum": 0, "maximum": 1},
+            "agreeableness": {"type": "number", "minimum": 0, "maximum": 1},
+            "neuroticism": {"type": "number", "minimum": 0, "maximum": 1},
+            "narrative_agency": {"type": "number", "minimum": 0, "maximum": 1},
+            "narrative_communion": {"type": "number", "minimum": 0, "maximum": 1},
+            "narrative_redemption": {"type": "number", "minimum": 0, "maximum": 1},
+            "dominant_values": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1,
+            },
+            "summary_prose": {"type": "string"},
+            "identity_block": {"type": "string"},
+        },
+        "required": [
+            "openness",
+            "conscientiousness",
+            "extraversion",
+            "agreeableness",
+            "neuroticism",
+            "narrative_agency",
+            "narrative_communion",
+            "narrative_redemption",
+            "dominant_values",
+            "summary_prose",
+            "identity_block",
+        ],
+        "additionalProperties": False,
+    }
+    emotion_schema = {
+        "type": "object",
+        "properties": {
+            "emotion_label": {"type": "string", "enum": emotion_labels},
+            "intensity": {"type": "number", "minimum": 0, "maximum": 1},
+        },
+        "required": ["emotion_label", "intensity"],
+        "additionalProperties": False,
+    }
+
+    task = item.get("task")
+    if not isinstance(task, str) or task not in {"trait_inference", "emotion_classify"}:
+        raise ValueError("task must be trait_inference or emotion_classify")
+
+    input_text = require_non_empty_string(item, "input")
+    schema = trait_schema if task == "trait_inference" else emotion_schema
+    max_tokens = 1024 if task == "trait_inference" else 64
+
+    def build_prompt(extra_instruction: str | None = None) -> str:
+        if task == "trait_inference":
+            system_prompt = """You are a careful personality psychologist analysing a corpus of diary entries and interview subject turns.
+Return only valid JSON matching the requested schema.
+Score all numeric fields from 0.0 to 1.0.
+Write summary_prose as a concise prose analysis.
+Write identity_block as a static first-person identity description suitable for a persona system prompt."""
+            user_prompt = f"Analyse this corpus:\n\n{input_text}"
+        else:
+            system_prompt = """You classify the emotional register of a short generated response.
+Return only valid JSON matching the requested schema.
+Choose exactly one emotion_label from: warm, sad, frustrated, anxious, amused, tender, indignant, reflective.
+Score intensity from 0.0 to 1.0."""
+            user_prompt = f"Classify this passage:\n\n{input_text}"
+
+        if extra_instruction:
+            system_prompt = f"{system_prompt}\n{extra_instruction}"
+
+        return f"<|system|>\n{system_prompt}\n<|user|>\n{user_prompt}\n<|assistant|>\n"
+
+    def create_sampling_params() -> SamplingParams:
+        try:
+            from vllm.sampling_params import StructuredOutputsParams
+
+            return SamplingParams(
+                temperature=0.2,
+                max_tokens=max_tokens,
+                structured_outputs=StructuredOutputsParams(
+                    json=schema,
+                    backend="outlines",
+                ),
+            )
+        except (ImportError, TypeError):
+            from vllm.sampling_params import GuidedDecodingParams
+
+            return SamplingParams(
+                temperature=0.2,
+                max_tokens=max_tokens,
+                guided_decoding=GuidedDecodingParams.from_optional(
+                    json=schema,
+                    backend="outlines",
+                ),
+            )
+
+    def parse_model_json(text: str) -> dict:
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.strip("`").strip()
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:].strip()
+
+        result = json.loads(cleaned)
+        if not isinstance(result, dict):
+            raise ValueError("model output must be a JSON object")
+        return result
+
+    def validate_unit_number(value: object, field: str) -> float:
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"{field} must be a number")
+        normalized = float(value)
+        if normalized < 0 or normalized > 1:
+            raise ValueError(f"{field} must be between 0 and 1")
+        return normalized
+
+    def validate_result(value: dict) -> dict:
+        if task == "trait_inference":
+            result = {
+                "openness": validate_unit_number(value.get("openness"), "openness"),
+                "conscientiousness": validate_unit_number(
+                    value.get("conscientiousness"),
+                    "conscientiousness",
+                ),
+                "extraversion": validate_unit_number(
+                    value.get("extraversion"),
+                    "extraversion",
+                ),
+                "agreeableness": validate_unit_number(
+                    value.get("agreeableness"),
+                    "agreeableness",
+                ),
+                "neuroticism": validate_unit_number(
+                    value.get("neuroticism"),
+                    "neuroticism",
+                ),
+                "narrative_agency": validate_unit_number(
+                    value.get("narrative_agency"),
+                    "narrative_agency",
+                ),
+                "narrative_communion": validate_unit_number(
+                    value.get("narrative_communion"),
+                    "narrative_communion",
+                ),
+                "narrative_redemption": validate_unit_number(
+                    value.get("narrative_redemption"),
+                    "narrative_redemption",
+                ),
+            }
+            dominant_values = value.get("dominant_values")
+            summary_prose = value.get("summary_prose")
+            identity_block = value.get("identity_block")
+
+            if (
+                not isinstance(dominant_values, list)
+                or not dominant_values
+                or not all(
+                    isinstance(entry, str) and entry.strip()
+                    for entry in dominant_values
+                )
+            ):
+                raise ValueError("dominant_values must be a non-empty string array")
+            if not isinstance(summary_prose, str) or not summary_prose.strip():
+                raise ValueError("summary_prose must be a non-empty string")
+            if not isinstance(identity_block, str) or not identity_block.strip():
+                raise ValueError("identity_block must be a non-empty string")
+
+            result["dominant_values"] = [
+                entry.strip() for entry in dominant_values if entry.strip()
+            ]
+            result["summary_prose"] = summary_prose.strip()
+            result["identity_block"] = identity_block.strip()
+            return result
+
+        emotion_label = value.get("emotion_label")
+        if emotion_label not in emotion_labels:
+            raise ValueError("emotion_label is invalid")
+
+        return {
+            "emotion_label": emotion_label,
+            "intensity": validate_unit_number(value.get("intensity"), "intensity"),
+        }
+
+    llm = LLM(
+        model="/model-weights/llama-3.1-8b-instruct",
+        max_model_len=8192,
+    )
+    sampling_params = create_sampling_params()
+
+    for attempt in range(2):
+        prompt = build_prompt(retry_instruction if attempt == 1 else None)
+        outputs = llm.generate([prompt], sampling_params)
+        text = outputs[0].outputs[0].text.strip()
+
+        try:
+            return {"result": validate_result(parse_model_json(text))}
+        except (json.JSONDecodeError, ValueError):
+            if attempt == 1:
+                return {"error": "parse_failed"}
+
+    return {"error": "parse_failed"}

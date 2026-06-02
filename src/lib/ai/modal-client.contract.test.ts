@@ -299,6 +299,51 @@ async function analyse_wrappers_throw_typed_errors_for_invalid_payloads() {
       }),
     "missing result",
   );
+
+  await assertRejectsWithModalError(
+    () =>
+      inferTraits("I try to do the right thing.", {
+        endpointUrl: "https://example.modal.run/analyse",
+        fetchFn: async () =>
+          new Response(
+            JSON.stringify({
+              result: {
+                openness: 2,
+                conscientiousness: 0.6,
+                extraversion: 0.5,
+                agreeableness: 0.8,
+                neuroticism: 0.2,
+                narrative_agency: 0.65,
+                narrative_communion: 0.75,
+                narrative_redemption: 0.55,
+                dominant_values: ["benevolence"],
+                summary_prose: "Reflective and warm.",
+                identity_block: "I am reflective and warm.",
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      }),
+    "invalid trait_inference result",
+  );
+
+  await assertRejectsWithModalError(
+    () =>
+      classifyEmotion("Oh my goodness, is little Freddy okay?", {
+        endpointUrl: "https://example.modal.run/analyse",
+        fetchFn: async () =>
+          new Response(
+            JSON.stringify({
+              result: {
+                emotion_label: "excited",
+                intensity: 0.72,
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+      }),
+    "invalid emotion_classify result",
+  );
 }
 
 async function assertRejectsWithModalError(

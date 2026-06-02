@@ -590,24 +590,53 @@ This endpoint uses the same base Llama 3.1 8B model as `/infer` but with **no Lo
 
 ```
 modal/
-└── analyse/
-    ├── handler.py
-    ├── Dockerfile
-    └── requirements.txt
+└── app.py                              -- add analyse_image and analyse function here
 
 src/lib/ai/
 └── analyse.ts                          -- typed TypeScript wrapper
 ```
 
+> **Do not** create a separate `modal/analyse/` subdirectory, Dockerfile, or `requirements.txt`. The project uses a single consolidated `modal/app.py` with one `modal.App("digital-legacy")`. Add `/analyse` as a new `@app.function` following the exact same pattern as the existing `infer`, `stt`, `tts`, and `embed` functions. This shares the Volume, secrets, and deploy lifecycle automatically.
+
 ---
 
-### Handler requirements
+### `modal/app.py` changes
 
-**`modal/analyse/handler.py`**
+**Add `analyse_image`** alongside the existing image definitions:
 
-Follows the same RunPod/Modal serverless pattern as other handlers. Loads model from `/model-weights/llama-3.1-8b-instruct` at startup. No LoRA adapter loaded.
+```python
+analyse_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .pip_install([
+        "vllm",
+        "huggingface_hub",
+        "fastapi[standard]",
+    ])
+)
+```
 
-vLLM configuration differences from `/infer`:
+**Add `analyse` function** following the `infer` function:
+
+```python
+@app.function(
+    image=analyse_image,
+    gpu="A10G",
+    volumes={"/model-weights": volume},
+    secrets=[
+        modal.Secret.from_name("digital-legacy-b2"),
+        modal.Secret.from_name("huggingface"),
+    ],
+    timeout=600,
+    scaledown_window=600,
+)
+@modal.fastapi_endpoint(method="POST")
+def analyse(item: dict) -> dict:
+    ...
+```
+
+The function body loads the model from `/model-weights/llama-3.1-8b-instruct` with **no LoRA adapter**.
+
+vLLM configuration differences from `infer`:
 - `temperature=0.2`
 - `guided_decoding_backend="outlines"` with JSON schema enforcement per task type
 - `max_tokens=1024` for trait inference, `max_tokens=64` for emotion classification
@@ -690,9 +719,9 @@ Both functions call `POST {MODAL_ANALYSE_URL}` with the appropriate task type. T
 
 **After building:**
 
-1. Build and push the Docker image: `docker build -t YOUR_USERNAME/digital-legacy-analyse:latest ./modal/analyse && docker push`
-2. Create a new Modal serverless endpoint (`digital-legacy-analyse`) using this image — same configuration as existing endpoints but with an A10G GPU (same as `/infer`; long-context inference benefits from VRAM)
-3. Add `MODAL_ANALYSE_URL` to `.env.local` and Vercel environment variables
+1. Deploy with `modal deploy modal/app.py` — the `analyse` function will be published alongside the existing endpoints as part of the same `digital-legacy` app.
+2. Copy the generated `analyse` endpoint URL from the Modal console or deploy output.
+3. Add `MODAL_ANALYSE_URL` to `.env.local` and Vercel environment variables.
 
 ---
 

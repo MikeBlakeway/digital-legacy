@@ -10,6 +10,7 @@ import type { TtsInput } from "../src/lib/ai/tts";
 
 const REEXEC_ENV = "DIGITAL_LEGACY_REACT_SERVER_REEXEC";
 const REQUIRED_ENV = [
+  "MODAL_ANALYSE_URL",
   "MODAL_EMBED_URL",
   "MODAL_INFER_URL",
   "MODAL_STT_URL",
@@ -18,6 +19,7 @@ const REQUIRED_ENV = [
 
 const TEST_TIMEOUT_MS = 300_000;
 const INFER_TIMEOUT_MS = 580_000;
+const ANALYSE_TIMEOUT_MS = 580_000;
 
 if (!hasReactServerCondition()) {
   if (process.env[REEXEC_ENV] === "1") {
@@ -57,11 +59,13 @@ void main();
 
 async function main(): Promise<void> {
   const [
+    { classifyEmotion, inferTraits },
     { embedTexts, EMBEDDING_DIMENSIONS },
     { inferPersona },
     { transcribeAudio },
     { synthesizeSpeech },
   ] = await Promise.all([
+    import("../src/lib/ai/analyse"),
     import("../src/lib/ai/embed"),
     import("../src/lib/ai/infer"),
     import("../src/lib/ai/stt"),
@@ -103,6 +107,30 @@ async function main(): Promise<void> {
     }
 
     return `response: ${text.replace(/\s+/g, " ").slice(0, 100)}`;
+  });
+
+  await runTest("analyse trait_inference", async () => {
+    const traits = await inferTraits(createTraitCorpus(), {
+      timeoutMs: ANALYSE_TIMEOUT_MS,
+    });
+
+    if (!traits.identity_block.trim() || traits.dominant_values.length === 0) {
+      throw new Error("Analyse trait_inference returned an incomplete result.");
+    }
+
+    return `identity block: ${traits.identity_block.replace(/\s+/g, " ").slice(0, 100)}`;
+  });
+
+  await runTest("analyse emotion_classify", async () => {
+    const emotion = await classifyEmotion("I cannot believe he remembered that little detail.", {
+      timeoutMs: ANALYSE_TIMEOUT_MS,
+    });
+
+    if (!emotion.emotion_label || emotion.intensity < 0 || emotion.intensity > 1) {
+      throw new Error("Analyse emotion_classify returned an invalid result.");
+    }
+
+    return `${emotion.emotion_label} at ${emotion.intensity.toFixed(2)}`;
   });
 
   await runTest("stt", async () => {
@@ -215,6 +243,14 @@ function createSilentWav(): Buffer {
   buffer.writeUInt32LE(dataSize, 40);
 
   return buffer;
+}
+
+function createTraitCorpus(): string {
+  return Array.from(
+    { length: 220 },
+    (_value, index) =>
+      `Memory ${index + 1}: I tried to be dependable for my family, stayed curious about the world, and learned from difficult moments with patience and care.`,
+  ).join("\n---\n");
 }
 
 function isLikelyMissingVoiceSample(error: unknown): boolean {
