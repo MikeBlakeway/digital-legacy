@@ -8,6 +8,9 @@
 !.yarn/versions
 /dist
 /coverage
+test-results/
+playwright-report/
+tests/e2e/.auth/
 /.next/
 /out/
 /build
@@ -16,6 +19,7 @@
 /.vscode
 /.idea
 /plans
+/docs/debug
 
 .env.local
 .env.development
