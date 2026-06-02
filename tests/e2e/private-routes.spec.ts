@@ -54,3 +54,17 @@ test("authenticated account can reach a persona profile page", async ({ page }) 
     /openness|conscientiousness|extraversion|agreeableness|neuroticism/i,
   );
 });
+
+test("authenticated account can reach a persona memory browser", async ({
+  page,
+}) => {
+  const personaSlug = getPersonaSlug();
+  test.skip(!personaSlug, "Set PLAYWRIGHT_TEST_PERSONA_SLUG to test memory UI.");
+
+  await page.goto(`/capture/${personaSlug}/memories`);
+
+  await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
+  await expect(page.getByRole("heading", { name: /memories/i })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Search memories" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "All" })).toBeVisible();
+});

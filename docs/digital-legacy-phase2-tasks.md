@@ -958,12 +958,12 @@ Total memory count. Source filter tabs (All / Diary / Interviews / Media). `<Mem
 
 ### Acceptance criteria
 
-- [ ] Memories from diary and interview sources appear in the browser
-- [ ] `is_private` toggle updates correctly and reflects immediately
-- [ ] Delete removes the card without full page reload
-- [ ] Source filter tabs correctly filter by `source` field
-- [ ] ilike search filters by content
-- [ ] `tsc --noEmit` passes, no `any` types
+- [x] Memories from diary and interview sources appear in the browser
+- [x] `is_private` toggle updates correctly and reflects immediately
+- [x] Delete removes the card without full page reload
+- [x] Source filter tabs correctly filter by `source` field
+- [x] ilike search filters by content
+- [x] `tsc --noEmit` passes, no `any` types
 
 ---
 
