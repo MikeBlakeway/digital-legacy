@@ -1,9 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type TraitInferenceButtonProps = {
   personaSlug: string;
+  actionLabel?: string;
+  runningLabel?: string;
+  disabled?: boolean;
+  disabledMessage?: string;
+  successMessage?: string;
 };
 
 type AnalyseState =
@@ -15,11 +21,22 @@ type AnalyseState =
 
 export default function TraitInferenceButton({
   personaSlug,
+  actionLabel = "Refresh profile",
+  runningLabel = "Analysing...",
+  disabled = false,
+  disabledMessage,
+  successMessage = "Profile refreshed.",
 }: TraitInferenceButtonProps) {
+  const router = useRouter();
   const [state, setState] = useState<AnalyseState>({ status: "idle" });
   const isRunning = state.status === "running";
+  const isDisabled = disabled || isRunning;
 
   async function refreshProfile() {
+    if (disabled) {
+      return;
+    }
+
     setState({ status: "running" });
 
     try {
@@ -43,6 +60,7 @@ export default function TraitInferenceButton({
       }
 
       setState({ status: "success", version: body.version });
+      router.refresh();
     } catch {
       setState({ status: "error" });
     }
@@ -59,18 +77,38 @@ export default function TraitInferenceButton({
         <button
           type="button"
           onClick={refreshProfile}
-          disabled={isRunning}
+          disabled={isDisabled}
           className="rounded-md bg-stone-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-400 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-300 dark:disabled:bg-zinc-700 dark:disabled:text-zinc-400"
         >
-          {isRunning ? "Analysing..." : "Refresh profile"}
+          {isRunning ? runningLabel : actionLabel}
         </button>
       </div>
-      <StatusMessage state={state} />
+      <StatusMessage
+        state={state}
+        disabledMessage={disabled ? disabledMessage : undefined}
+        successMessage={successMessage}
+      />
     </div>
   );
 }
 
-function StatusMessage({ state }: { state: AnalyseState }) {
+function StatusMessage({
+  state,
+  disabledMessage,
+  successMessage,
+}: {
+  state: AnalyseState;
+  disabledMessage?: string;
+  successMessage: string;
+}) {
+  if (disabledMessage) {
+    return (
+      <p className="text-sm text-stone-600 dark:text-zinc-300">
+        {disabledMessage}
+      </p>
+    );
+  }
+
   if (state.status === "idle" || state.status === "running") {
     return null;
   }
@@ -78,7 +116,7 @@ function StatusMessage({ state }: { state: AnalyseState }) {
   if (state.status === "success") {
     return (
       <p className="text-sm text-emerald-700 dark:text-emerald-300">
-        Profile updated to version {state.version}.
+        {successMessage}
       </p>
     );
   }
