@@ -47,6 +47,13 @@ export type DiaryEntryListItem = {
   has_voice: boolean;
 };
 
+export type DiaryTraitSource = {
+  id: string;
+  text: string;
+  word_count: number;
+  created_at: string;
+};
+
 export type DiaryStats = {
   total_entries: number;
   total_word_count: number;
@@ -228,6 +235,56 @@ export async function getDiaryStats(
   };
 }
 
+export async function listDiaryTraitSources(
+  client: SupabaseClient,
+  personaId: string,
+): Promise<DiaryTraitSource[]> {
+  const result = await client
+    .from("diary_entries")
+    .select("id, content, transcript, word_count, created_at")
+    .eq("persona_id", normalizeRequiredText(personaId, "personaId"))
+    .order("created_at", { ascending: true });
+  const rows: unknown = result.data;
+
+  if (result.error) {
+    throw new DiaryDatabaseError(
+      "Failed to load diary entries for trait inference.",
+      result.error,
+    );
+  }
+
+  if (!Array.isArray(rows)) {
+    throw new DiaryDatabaseError(
+      "Supabase returned invalid diary trait sources.",
+      rows,
+    );
+  }
+
+  return rows.flatMap(normalizeDiaryTraitSource);
+}
+
+export async function markDiaryEntriesProcessed(
+  client: SupabaseClient,
+  entryIds: string[],
+  processedAt: string,
+): Promise<void> {
+  if (entryIds.length === 0) {
+    return;
+  }
+
+  const result = await client
+    .from("diary_entries")
+    .update({ processed_at: normalizeRequiredText(processedAt, "processedAt") })
+    .in("id", entryIds.map((id) => normalizeRequiredText(id, "entryId")));
+
+  if (result.error) {
+    throw new DiaryDatabaseError(
+      "Failed to mark diary entries as processed.",
+      result.error,
+    );
+  }
+}
+
 export async function insertEmotionalVoiceSample(
   client: SupabaseClient,
   data: InsertEmotionalVoiceSampleData,
@@ -307,6 +364,44 @@ function normalizeDiaryEntryListItem(value: unknown): DiaryEntryListItem {
     created_at: value.created_at,
     has_voice: typeof value.voice_b2_key === "string",
   };
+}
+
+function normalizeDiaryTraitSource(value: unknown): DiaryTraitSource[] {
+  if (!isRecord(value)) {
+    throw new DiaryDatabaseError(
+      "Supabase returned an invalid diary trait source.",
+      value,
+    );
+  }
+
+  if (
+    typeof value.id !== "string" ||
+    (typeof value.content !== "string" && value.content !== null) ||
+    (typeof value.transcript !== "string" && value.transcript !== null) ||
+    (typeof value.word_count !== "number" && value.word_count !== null) ||
+    typeof value.created_at !== "string"
+  ) {
+    throw new DiaryDatabaseError(
+      "Supabase returned an invalid diary trait source.",
+      value,
+    );
+  }
+
+  const text =
+    normalizeOptionalText(value.content) ?? normalizeOptionalText(value.transcript);
+
+  if (!text) {
+    return [];
+  }
+
+  return [
+    {
+      id: value.id,
+      text,
+      word_count: value.word_count ?? countWords(text),
+      created_at: value.created_at,
+    },
+  ];
 }
 
 function normalizeEmotionalVoiceSample(value: unknown): EmotionalVoiceSample {

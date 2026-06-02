@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import TraitInferenceButton from "@/components/capture/TraitInferenceButton";
 import { getPersonaBySlug } from "@/lib/supabase/personas";
 import {
   createClient as createServerClient,
@@ -71,6 +72,8 @@ export default async function CaptureDashboardPage({
             </button>
           ))}
         </nav>
+
+        <TraitInferenceButton personaSlug={persona.slug} />
       </section>
     </main>
   );

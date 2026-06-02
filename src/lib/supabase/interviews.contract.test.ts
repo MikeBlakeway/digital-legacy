@@ -5,13 +5,16 @@ import type { InterviewThemeId } from "@/lib/interview-themes";
 import {
   appendInterviewMessages,
   createInterviewSession,
+  extractSubjectTurnContents,
   getInterviewSession,
   getInterviewSessionCounts,
+  listCompletedInterviewTraitSources,
   listInterviewSessions,
   type CreateInterviewSessionData,
   type InterviewMessage,
   type InterviewSession,
   type InterviewSessionListItem,
+  type InterviewTraitSource,
   type InterviewSessionThemeCounts,
 } from "@/lib/supabase/interviews";
 
@@ -55,6 +58,9 @@ async function assertInterviewContracts(supabase: SupabaseClient) {
     supabase,
     session.persona_id,
   );
+  const traitSources: InterviewTraitSource[] =
+    await listCompletedInterviewTraitSources(supabase, session.persona_id);
+  const subjectTurns: string[] = extractSubjectTurnContents(updated.messages);
   const counts: InterviewSessionThemeCounts = await getInterviewSessionCounts(
     supabase,
     session.persona_id,
@@ -64,6 +70,8 @@ async function assertInterviewContracts(supabase: SupabaseClient) {
     updated,
     fetched,
     sessions,
+    traitSources,
+    subjectTurns,
     counts,
   };
 }

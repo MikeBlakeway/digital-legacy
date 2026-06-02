@@ -42,6 +42,13 @@ export type InterviewSessionListItem = {
   latest_message_preview: string;
 };
 
+export type InterviewTraitSource = {
+  id: string;
+  subject_turns: string[];
+  completed_at: string;
+  created_at: string;
+};
+
 export type InterviewSessionThemeCounts = Record<InterviewThemeId, number>;
 
 export type CreateInterviewSessionData = {
@@ -241,6 +248,47 @@ export async function getInterviewSessionCounts(
   return counts;
 }
 
+export async function listCompletedInterviewTraitSources(
+  client: SupabaseClient,
+  personaId: string,
+): Promise<InterviewTraitSource[]> {
+  const result = await client
+    .from("interview_sessions")
+    .select(INTERVIEW_SESSION_COLUMNS)
+    .eq("persona_id", normalizeRequiredText(personaId, "personaId"))
+    .not("completed_at", "is", null)
+    .order("created_at", { ascending: true });
+  const rows: unknown = result.data;
+
+  if (result.error) {
+    throw new InterviewDatabaseError(
+      "Failed to load interviews for trait inference.",
+      result.error,
+    );
+  }
+
+  if (!Array.isArray(rows)) {
+    throw new InterviewDatabaseError(
+      "Supabase returned invalid interview trait sources.",
+      rows,
+    );
+  }
+
+  return rows.map((row) =>
+    toInterviewTraitSource(normalizeInterviewSession(row)),
+  );
+}
+
+export function extractSubjectTurnContents(
+  messages: InterviewMessage[],
+): string[] {
+  return messages.flatMap((message) => {
+    const content = message.content.trim();
+
+    return message.role === "subject" && content ? [content] : [];
+  });
+}
+
 export function createEmptyInterviewSessionCounts(): InterviewSessionThemeCounts {
   return INTERVIEW_THEMES.reduce<InterviewSessionThemeCounts>(
     (counts, theme) => ({
@@ -284,6 +332,22 @@ function toInterviewSessionListItem(
     completed_at: session.completed_at,
     created_at: session.created_at,
     latest_message_preview: createInterviewPreview(latestMessage?.content ?? ""),
+  };
+}
+
+function toInterviewTraitSource(session: InterviewSession): InterviewTraitSource {
+  if (!session.completed_at) {
+    throw new InterviewDatabaseError(
+      "Supabase returned an incomplete interview for trait inference.",
+      session,
+    );
+  }
+
+  return {
+    id: session.id,
+    subject_turns: extractSubjectTurnContents(session.messages),
+    completed_at: session.completed_at,
+    created_at: session.created_at,
   };
 }
 

@@ -8,11 +8,14 @@ import {
   getDiaryStats,
   insertEmotionalVoiceSample,
   isEmotionLabel,
+  listDiaryTraitSources,
   listDiaryEntries,
+  markDiaryEntriesProcessed,
   updateDiaryTranscript,
   type DiaryEntry,
   type DiaryEntryListItem,
   type DiaryStats,
+  type DiaryTraitSource,
   type EmotionLabel,
   type EmotionUpdate,
   type EmotionalVoiceSample,
@@ -54,15 +57,26 @@ async function assertDiaryContracts(supabase: SupabaseClient) {
     page: 1,
     perPage: 10,
   });
+  const traitSources: DiaryTraitSource[] = await listDiaryTraitSources(
+    supabase,
+    entry.persona_id,
+  );
 
   const stats: DiaryStats = await getDiaryStats(supabase, entry.persona_id);
   const words: number = countWords("one two three");
   const preview: string = createDiaryPreview("a".repeat(250));
 
+  await markDiaryEntriesProcessed(
+    supabase,
+    [entry.id],
+    "2026-02-01T00:00:00.000Z",
+  );
+
   return {
     updated,
     sample,
     entries,
+    traitSources,
     stats,
     words,
     preview,
