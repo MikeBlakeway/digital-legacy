@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import AudioPlayer from '@/components/conversation/AudioPlayer'
 import ChatInput from '@/components/conversation/ChatInput'
 import ChatMessage, {
   type ChatMessageRecord
 } from '@/components/conversation/ChatMessage'
+import VoiceModeToggle from '@/components/conversation/VoiceModeToggle'
 
 type ChatWindowProps = {
   personaSlug: string
@@ -17,6 +19,8 @@ type ChatWindowProps = {
 type ChatResponse = {
   message: string
   conversation_id: string
+  audio_url?: string
+  tts_failed?: boolean
   media_assets?: {
     id: string
     url: string
@@ -34,22 +38,38 @@ export default function ChatWindow({
   const [inputValue, setInputValue] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [voiceWarning, setVoiceWarning] = useState<string | null>(null)
+  const [latestAudioUrl, setLatestAudioUrl] = useState<string | null>(null)
+  const [isVoiceMode, setIsVoiceMode] = useState(false)
   const [currentConversationId, setCurrentConversationId] =
     useState(conversationId)
   const bottomRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    const latestAssistantAudio = [...messages]
+      .reverse()
+      .find((message) => message.role === 'assistant' && message.audio_url)
+
+    setLatestAudioUrl(latestAssistantAudio?.audio_url ?? null)
+  }, [messages])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, isSubmitting])
 
-  async function submitMessage() {
-    const trimmed = inputValue.trim()
+  async function submitMessage(params?: {
+    mode?: 'text' | 'voice'
+    content?: string
+  }) {
+    const trimmed = (params?.content ?? inputValue).trim()
+    const mode = params?.mode ?? (isVoiceMode ? 'voice' : 'text')
 
     if (!trimmed || isSubmitting) {
       return
     }
 
     setErrorMessage(null)
+    setVoiceWarning(null)
     setIsSubmitting(true)
     setInputValue('')
 
@@ -72,7 +92,7 @@ export default function ChatWindow({
         body: JSON.stringify({
           message: trimmed,
           conversation_id: currentConversationId,
-          mode: 'text'
+          mode
         })
       })
       const payload: unknown = await response.json().catch(() => null)
@@ -81,6 +101,7 @@ export default function ChatWindow({
         setErrorMessage(
           'This persona is unavailable right now — please try again in a moment.'
         )
+        setLatestAudioUrl(null)
         setMessages((current) =>
           current.filter((message) => message.id !== optimisticMessage.id)
         )
@@ -89,6 +110,7 @@ export default function ChatWindow({
 
       if (!response.ok || !isChatResponse(payload)) {
         setErrorMessage('The message could not be sent.')
+        setLatestAudioUrl(null)
         setMessages((current) =>
           current.filter((message) => message.id !== optimisticMessage.id)
         )
@@ -96,6 +118,12 @@ export default function ChatWindow({
       }
 
       setCurrentConversationId(payload.conversation_id)
+      setLatestAudioUrl(payload.audio_url ?? null)
+
+      if (payload.tts_failed) {
+        setVoiceWarning('Voice unavailable — showing text response.')
+      }
+
       setMessages((current) => [
         ...current,
         {
@@ -103,11 +131,13 @@ export default function ChatWindow({
           role: 'assistant',
           content: payload.message,
           created_at: new Date().toISOString(),
-          media_assets: payload.media_assets ?? []
+          media_assets: payload.media_assets ?? [],
+          ...(payload.audio_url ? { audio_url: payload.audio_url } : {})
         }
       ])
     } catch {
       setErrorMessage('The message could not be sent.')
+      setLatestAudioUrl(null)
       setMessages((current) =>
         current.filter((message) => message.id !== optimisticMessage.id)
       )
@@ -152,16 +182,43 @@ export default function ChatWindow({
       </div>
 
       <div className='border-t border-stone-200 p-3 dark:border-zinc-800'>
+        <VoiceModeToggle
+          personaSlug={personaSlug}
+          disabled={isSubmitting}
+          isVoiceMode={isVoiceMode}
+          onModeChange={setIsVoiceMode}
+          onTranscript={(transcript) => {
+            setInputValue(transcript)
+            void submitMessage({
+              mode: 'voice',
+              content: transcript
+            })
+          }}
+        />
+
+        <div className='mt-3'>
+          <AudioPlayer src={latestAudioUrl} />
+        </div>
+
         {errorMessage ? (
-          <p className='mb-2 text-sm text-red-700 dark:text-red-300'>
+          <p className='mb-2 mt-2 text-sm text-red-700 dark:text-red-300'>
             {errorMessage}
           </p>
         ) : null}
+
+        {voiceWarning ? (
+          <p className='mb-2 mt-2 text-sm text-amber-700 dark:text-amber-300'>
+            {voiceWarning}
+          </p>
+        ) : null}
+
         <ChatInput
           value={inputValue}
           disabled={isSubmitting}
           onChange={setInputValue}
-          onSubmit={submitMessage}
+          onSubmit={() => {
+            void submitMessage()
+          }}
         />
       </div>
     </section>
@@ -189,6 +246,8 @@ function isChatResponse(value: unknown): value is ChatResponse {
     isRecord(value) &&
     typeof value.message === 'string' &&
     typeof value.conversation_id === 'string' &&
+    (value.audio_url === undefined || typeof value.audio_url === 'string') &&
+    (value.tts_failed === undefined || typeof value.tts_failed === 'boolean') &&
     (value.media_assets === undefined ||
       (Array.isArray(value.media_assets) &&
         value.media_assets.every(

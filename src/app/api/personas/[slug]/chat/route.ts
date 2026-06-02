@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { classifyEmotion } from '@/lib/ai/analyse'
 import { inferPersona, type InferMessage } from '@/lib/ai/infer'
+import { synthesizeSpeech } from '@/lib/ai/tts'
 import { createPresignedDownloadUrl } from '@/lib/b2/client'
+import { putObjectFromBase64 } from '@/lib/b2/client'
 import { buildPersonaSystemPrompt } from '@/lib/persona-prompt'
 import { retrieveMemoriesByEmbedding } from '@/lib/rag/retrieve'
 import { embedText } from '@/lib/ai/embed'
@@ -11,6 +14,7 @@ import {
   insertConversationMessage,
   listConversationMessages,
   touchConversation,
+  updateConversationMessageAudioKey,
   type Conversation
 } from '@/lib/supabase/conversations'
 import { getPersonaBySlug, type Persona } from '@/lib/supabase/personas'
@@ -39,6 +43,11 @@ type ChatResponseMediaAsset = {
   id: string
   url: string
   caption: string
+}
+
+type VoiceSynthesisResult = {
+  audioB2Key: string
+  audioUrl: string
 }
 
 export async function POST(request: NextRequest, context: ChatRouteContext) {
@@ -124,20 +133,177 @@ export async function POST(request: NextRequest, context: ChatRouteContext) {
     retrievedMemoryIds: []
   })
 
-  await insertConversationMessage(serviceClient, {
+  const assistantMessage = await insertConversationMessage(serviceClient, {
     conversationId: conversation.id,
     role: 'assistant',
     content: assistantText,
     retrievedMemoryIds: memoryIds
   })
 
+  let voiceResult: VoiceSynthesisResult | null = null
+  let ttsFailed = false
+
+  if (parsed.mode === 'voice') {
+    try {
+      voiceResult = await synthesizeVoiceResponse({
+        client: serviceClient,
+        persona: access.persona,
+        assistantMessageId: assistantMessage.id,
+        responseText: assistantText
+      })
+
+      if (voiceResult) {
+        await updateConversationMessageAudioKey(serviceClient, {
+          messageId: assistantMessage.id,
+          audioB2Key: voiceResult.audioB2Key
+        })
+      } else {
+        ttsFailed = true
+      }
+    } catch (error) {
+      console.error('Voice synthesis failed.', error)
+      ttsFailed = true
+    }
+  }
+
   await touchConversation(serviceClient, conversation.id)
 
   return NextResponse.json({
     message: assistantText,
     conversation_id: conversation.id,
+    ...(voiceResult ? { audio_url: voiceResult.audioUrl } : {}),
+    ...(ttsFailed ? { tts_failed: true } : {}),
     ...(mediaAssets.length > 0 ? { media_assets: mediaAssets } : {})
   })
+}
+
+async function synthesizeVoiceResponse({
+  client,
+  persona,
+  assistantMessageId,
+  responseText
+}: {
+  client: ReturnType<typeof createServiceRoleClient>
+  persona: Persona
+  assistantMessageId: string
+  responseText: string
+}): Promise<VoiceSynthesisResult | null> {
+  const neutralReferenceKey = persona.voice_sample_key
+
+  if (!neutralReferenceKey) {
+    return null
+  }
+
+  const neutralController = new AbortController()
+  const neutralTtsPromise = synthesizeSpeech(
+    {
+      text: responseText,
+      speaker_wav_b2_key: neutralReferenceKey,
+      language: 'en'
+    },
+    {
+      signal: neutralController.signal
+    }
+  )
+  const emotionKeyPromise = resolveEmotionReferenceKey(
+    client,
+    persona.id,
+    responseText
+  )
+
+  const firstSettled = await Promise.race([
+    neutralTtsPromise.then((result) => ({
+      type: 'tts' as const,
+      result
+    })),
+    emotionKeyPromise.then((emotionKey) => ({
+      type: 'emotion' as const,
+      emotionKey
+    }))
+  ])
+
+  let audioBase64: string
+
+  if (firstSettled.type === 'emotion' && firstSettled.emotionKey) {
+    neutralController.abort()
+    await neutralTtsPromise.catch(() => undefined)
+
+    try {
+      const emotionalTts = await synthesizeSpeech({
+        text: responseText,
+        speaker_wav_b2_key: neutralReferenceKey,
+        emotion_b2_key: firstSettled.emotionKey,
+        language: 'en'
+      })
+
+      audioBase64 = emotionalTts.audio_base64
+    } catch {
+      const fallbackNeutralTts = await synthesizeSpeech({
+        text: responseText,
+        speaker_wav_b2_key: neutralReferenceKey,
+        language: 'en'
+      })
+
+      audioBase64 = fallbackNeutralTts.audio_base64
+    }
+  } else if (firstSettled.type === 'tts') {
+    audioBase64 = firstSettled.result.audio_base64
+  } else {
+    const neutralTts = await neutralTtsPromise
+    audioBase64 = neutralTts.audio_base64
+  }
+
+  const audioB2Key = `tts-cache/${assistantMessageId}.wav`
+  await putObjectFromBase64({
+    key: audioB2Key,
+    base64: audioBase64,
+    contentType: 'audio/wav'
+  })
+  const audioUrl = await createPresignedDownloadUrl({
+    key: audioB2Key,
+    expiresInSeconds: MEDIA_URL_EXPIRES_IN_SECONDS,
+    responseContentType: 'audio/wav'
+  })
+
+  return {
+    audioB2Key,
+    audioUrl
+  }
+}
+
+async function resolveEmotionReferenceKey(
+  client: ReturnType<typeof createServiceRoleClient>,
+  personaId: string,
+  responseText: string
+): Promise<string | null> {
+  try {
+    const emotion = await classifyEmotion(responseText)
+    const result = await client
+      .from('emotional_voice_samples')
+      .select('b2_key')
+      .eq('persona_id', personaId)
+      .eq('emotion_label', emotion.emotion_label)
+      .order('quality_score', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (
+      result.error ||
+      !result.data ||
+      typeof result.data.b2_key !== 'string'
+    ) {
+      return null
+    }
+
+    return result.data.b2_key
+  } catch (error) {
+    console.error(
+      'Emotion classification failed. Proceeding with neutral TTS.',
+      error
+    )
+    return null
+  }
 }
 
 async function resolveConversation({

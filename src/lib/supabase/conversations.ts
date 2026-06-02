@@ -179,6 +179,33 @@ export async function insertConversationMessage(
   return normalizeConversationMessage(row)
 }
 
+export async function updateConversationMessageAudioKey(
+  client: SupabaseClient,
+  params: {
+    messageId: string
+    audioB2Key: string
+  }
+): Promise<ConversationMessage> {
+  const result = await client
+    .from('messages')
+    .update({
+      audio_b2_key: normalizeRequiredText(params.audioB2Key, 'audioB2Key')
+    })
+    .eq('id', normalizeRequiredText(params.messageId, 'messageId'))
+    .select(MESSAGE_COLUMNS)
+    .single()
+  const row: unknown = result.data
+
+  if (result.error) {
+    throw new ConversationDatabaseError(
+      'Failed to update message audio key.',
+      result.error
+    )
+  }
+
+  return normalizeConversationMessage(row)
+}
+
 export async function touchConversation(
   client: SupabaseClient,
   conversationId: string

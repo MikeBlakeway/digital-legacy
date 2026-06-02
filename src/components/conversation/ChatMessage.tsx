@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 
+import AudioPlayer from '@/components/conversation/AudioPlayer'
+
 export type ChatMediaAsset = {
   id: string
   url: string
@@ -14,6 +16,7 @@ export type ChatMessageRecord = {
   content: string
   created_at: string
   media_assets: ChatMediaAsset[]
+  audio_url?: string
 }
 
 type ChatMessageProps = {
@@ -75,12 +78,25 @@ export default function ChatMessage({
           </div>
         ) : null}
 
-        <p className='text-xs text-stone-500 dark:text-zinc-400'>
-          {new Intl.DateTimeFormat('en-GB', {
-            hour: '2-digit',
-            minute: '2-digit'
-          }).format(new Date(message.created_at))}
-        </p>
+        {isAssistant && message.audio_url ? (
+          <AudioPlayer src={message.audio_url} />
+        ) : null}
+
+        <div className='flex items-center gap-2 text-xs text-stone-500 dark:text-zinc-400'>
+          <span>
+            {new Intl.DateTimeFormat('en-GB', {
+              hour: '2-digit',
+              minute: '2-digit'
+            }).format(new Date(message.created_at))}
+          </span>
+
+          {isAssistant && message.audio_url ? (
+            <span className='inline-flex items-center gap-1 rounded-full border border-stone-300 bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200'>
+              <span aria-hidden='true'>🔊</span>
+              <span>Voice</span>
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {expandedAsset ? (

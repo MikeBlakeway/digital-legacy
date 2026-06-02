@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 
 import ChatWindow from '@/components/conversation/ChatWindow'
+import { createPresignedDownloadUrl } from '@/lib/b2/client'
 import {
   createConversation,
   getLatestConversation,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
+const AUDIO_URL_EXPIRES_IN_SECONDS = 15 * 60
 
 type TalkPageProps = {
   params: Promise<{
@@ -70,7 +72,7 @@ export default async function TalkPage({ params }: TalkPageProps) {
           personaSlug={access.persona.slug}
           personaName={access.persona.name}
           conversationId={conversation.id}
-          initialMessages={toChatMessages(initialMessages)}
+          initialMessages={await toChatMessages(initialMessages)}
         />
       </section>
     </main>
@@ -116,18 +118,28 @@ async function getAccessiblePersona(slug: string): Promise<
   return { persona, userId }
 }
 
-function toChatMessages(messages: ConversationMessage[]) {
-  return messages.map((message) => ({
-    id: message.id,
-    role: message.role,
-    content: message.content,
-    created_at: message.created_at,
-    media_assets: [] as {
-      id: string
-      url: string
-      caption: string
-    }[]
-  }))
+async function toChatMessages(messages: ConversationMessage[]) {
+  return Promise.all(
+    messages.map(async (message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      created_at: message.created_at,
+      media_assets: [] as {
+        id: string
+        url: string
+        caption: string
+      }[],
+      audio_url:
+        message.audio_b2_key && message.role === 'assistant'
+          ? await createPresignedDownloadUrl({
+              key: message.audio_b2_key,
+              expiresInSeconds: AUDIO_URL_EXPIRES_IN_SECONDS,
+              responseContentType: 'audio/wav'
+            })
+          : undefined
+    }))
+  )
 }
 
 function readUserId(claims: unknown): string | null {

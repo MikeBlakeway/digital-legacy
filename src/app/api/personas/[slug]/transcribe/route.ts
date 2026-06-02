@@ -1,122 +1,144 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from 'next/server'
 
-import { transcribeAudio } from "@/lib/ai/stt";
-import { readObjectAsBase64 } from "@/lib/b2/client";
-import { getPersonaBySlug, type Persona } from "@/lib/supabase/personas";
+import { transcribeAudio } from '@/lib/ai/stt'
+import { readObjectAsBase64 } from '@/lib/b2/client'
+import { getPersonaBySlug, type Persona } from '@/lib/supabase/personas'
 import {
   createClient as createServerClient,
-  createServiceRoleClient,
-} from "@/lib/supabase/server";
+  createServiceRoleClient
+} from '@/lib/supabase/server'
 
 type TranscribeRouteContext = {
   params: Promise<{
-    slug: string;
-  }>;
-};
+    slug: string
+  }>
+}
 
 type TranscribeRequest = {
-  voice_b2_key: string;
-};
+  voice_b2_key?: string
+  audio_base64?: string
+}
 
 export async function POST(
   request: NextRequest,
-  context: TranscribeRouteContext,
+  context: TranscribeRouteContext
 ) {
-  const persona = await getOwnedPersona(context);
+  const persona = await getOwnedPersona(context)
 
-  if ("response" in persona) {
-    return persona.response;
+  if ('response' in persona) {
+    return persona.response
   }
 
-  const parsed = await parseRequest(request, persona);
+  const parsed = await parseRequest(request, persona)
 
-  if ("fields" in parsed) {
+  if ('fields' in parsed) {
     return NextResponse.json(
-      { error: "invalid_request", fields: parsed.fields },
-      { status: 400 },
-    );
+      { error: 'invalid_request', fields: parsed.fields },
+      { status: 400 }
+    )
   }
 
   try {
-    const audioBase64 = await readObjectAsBase64({ key: parsed.voice_b2_key });
+    const audioBase64 = parsed.audio_base64
+      ? parsed.audio_base64
+      : await readObjectAsBase64({ key: parsed.voice_b2_key ?? '' })
     const transcript = await transcribeAudio({
       audio_base64: audioBase64,
-      language: "en",
-    });
+      language: 'en'
+    })
 
-    return NextResponse.json(transcript);
+    return NextResponse.json(transcript)
   } catch (error) {
-    console.error("Interview transcription failed.", error);
-    return NextResponse.json({ error: "transcription_failed" }, { status: 502 });
+    console.error('Interview transcription failed.', error)
+    return NextResponse.json({ error: 'transcription_failed' }, { status: 502 })
   }
 }
 
 async function getOwnedPersona(
-  context: TranscribeRouteContext,
+  context: TranscribeRouteContext
 ): Promise<Persona | { response: NextResponse }> {
-  const { slug } = await context.params;
-  const supabase = await createServerClient();
-  const claimsResult = await supabase.auth.getClaims();
-  const userId = readUserId(claimsResult.data?.claims);
+  const { slug } = await context.params
+  const supabase = await createServerClient()
+  const claimsResult = await supabase.auth.getClaims()
+  const userId = readUserId(claimsResult.data?.claims)
 
   if (claimsResult.error || !userId) {
     return {
-      response: NextResponse.json({ error: "unauthorized" }, { status: 401 }),
-    };
+      response: NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    }
   }
 
-  const persona = await getPersonaBySlug(createServiceRoleClient(), slug);
+  const persona = await getPersonaBySlug(createServiceRoleClient(), slug)
 
   if (!persona || persona.owner_user_id !== userId) {
     return {
-      response: NextResponse.json({ error: "not_found" }, { status: 404 }),
-    };
+      response: NextResponse.json({ error: 'not_found' }, { status: 404 })
+    }
   }
 
-  return persona;
+  return persona
 }
 
 async function parseRequest(
   request: NextRequest,
-  persona: Persona,
+  persona: Persona
 ): Promise<TranscribeRequest | { fields: Record<string, string> }> {
-  let body: unknown;
+  let body: unknown
 
   try {
-    body = await request.json();
+    body = await request.json()
   } catch {
-    return { fields: { body: "Request body must be valid JSON." } };
+    return { fields: { body: 'Request body must be valid JSON.' } }
   }
 
   if (!isRecord(body)) {
-    return { fields: { body: "Request body must be an object." } };
+    return { fields: { body: 'Request body must be an object.' } }
   }
 
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string> = {}
   const voiceB2Key =
-    typeof body.voice_b2_key === "string" ? body.voice_b2_key.trim() : "";
+    typeof body.voice_b2_key === 'string' ? body.voice_b2_key.trim() : ''
+  const audioBase64 =
+    typeof body.audio_base64 === 'string' ? body.audio_base64.trim() : ''
 
-  if (!voiceB2Key) {
-    fields.voice_b2_key = "Voice recording key is required.";
-  } else if (!voiceB2Key.startsWith(`interview/${persona.id}/`)) {
-    fields.voice_b2_key = "Voice recording key is not valid for this persona.";
+  if (!voiceB2Key && !audioBase64) {
+    fields.body = 'Provide audio_base64 or voice_b2_key.'
+  }
+
+  if (voiceB2Key && !voiceB2Key.startsWith(`interview/${persona.id}/`)) {
+    fields.voice_b2_key = 'Voice recording key is not valid for this persona.'
+  }
+
+  if (audioBase64 && !isBase64(audioBase64)) {
+    fields.audio_base64 = 'audio_base64 must be valid base64.'
   }
 
   if (Object.keys(fields).length > 0) {
-    return { fields };
+    return { fields }
   }
 
-  return { voice_b2_key: voiceB2Key };
+  return {
+    ...(voiceB2Key ? { voice_b2_key: voiceB2Key } : {}),
+    ...(audioBase64 ? { audio_base64: audioBase64 } : {})
+  }
+}
+
+function isBase64(value: string): boolean {
+  if (!value) {
+    return false
+  }
+
+  return /^[A-Za-z0-9+/]+={0,2}$/.test(value)
 }
 
 function readUserId(claims: unknown): string | null {
-  if (!isRecord(claims) || typeof claims.sub !== "string") {
-    return null;
+  if (!isRecord(claims) || typeof claims.sub !== 'string') {
+    return null
   }
 
-  return claims.sub;
+  return claims.sub
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
