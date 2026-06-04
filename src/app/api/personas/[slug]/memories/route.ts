@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { isMemorySourceFilter } from "@/lib/memory-sources";
-import { listMemories, MemoryDatabaseError } from "@/lib/supabase/memories";
+import {
+  isMemoryVisibilityFilter,
+  listMemories,
+  MemoryDatabaseError,
+} from "@/lib/supabase/memories";
 import { getPersonaBySlug, type Persona } from "@/lib/supabase/personas";
 import {
   createClient as createServerClient,
@@ -26,6 +30,7 @@ export async function GET(request: NextRequest, context: MemoriesRouteContext) {
 
   const url = new URL(request.url);
   const sourceParam = url.searchParams.get("source");
+  const visibilityParam = url.searchParams.get("visibility");
 
   if (sourceParam && !isMemorySourceFilter(sourceParam)) {
     return NextResponse.json(
@@ -40,13 +45,29 @@ export async function GET(request: NextRequest, context: MemoriesRouteContext) {
     );
   }
 
+  if (visibilityParam && !isMemoryVisibilityFilter(visibilityParam)) {
+    return NextResponse.json(
+      {
+        error: "invalid_request",
+        fields: {
+          visibility: "Visibility must be family or private.",
+        },
+      },
+      { status: 400 },
+    );
+  }
+
   const source = isMemorySourceFilter(sourceParam) ? sourceParam : null;
+  const visibility = isMemoryVisibilityFilter(visibilityParam)
+    ? visibilityParam
+    : null;
 
   try {
     const result = await listMemories(createServiceRoleClient(), {
       personaId: resolved.persona.id,
       q: url.searchParams.get("q"),
       source,
+      visibility,
       page: readPositiveInteger(url.searchParams.get("page"), 1),
       perPage: Math.min(
         readPositiveInteger(url.searchParams.get("per_page"), DEFAULT_PER_PAGE),

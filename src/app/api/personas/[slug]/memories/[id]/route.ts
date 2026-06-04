@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   deleteMemory,
   MemoryDatabaseError,
-  updateMemoryPrivacy,
+  isMemoryVisibilityFilter,
+  updateMemoryVisibility,
+  type MemoryVisibilityFilter,
 } from "@/lib/supabase/memories";
 import { getPersonaBySlug, type Persona } from "@/lib/supabase/personas";
 import {
@@ -19,7 +21,7 @@ type MemoryItemRouteContext = {
 };
 
 type PatchMemoryRequest = {
-  is_private: boolean;
+  visibility: MemoryVisibilityFilter;
 };
 
 export async function PATCH(
@@ -43,10 +45,10 @@ export async function PATCH(
 
   try {
     const { id } = await context.params;
-    const memory = await updateMemoryPrivacy(createServiceRoleClient(), {
+    const memory = await updateMemoryVisibility(createServiceRoleClient(), {
       personaId: resolved.persona.id,
       memoryId: id,
-      isPrivate: parsed.is_private,
+      visibility: parsed.visibility,
     });
 
     return NextResponse.json(memory);
@@ -136,11 +138,19 @@ async function parsePatchRequest(
     return { fields: { body: "Request body must be an object." } };
   }
 
-  if (typeof body.is_private !== "boolean") {
-    return { fields: { is_private: "Privacy must be true or false." } };
+  if (isMemoryVisibilityFilter(body.visibility)) {
+    return { visibility: body.visibility };
   }
 
-  return { is_private: body.is_private };
+  if (typeof body.is_private === "boolean") {
+    return { visibility: body.is_private ? "private" : "family" };
+  }
+
+  return {
+    fields: {
+      visibility: "Visibility must be family or private.",
+    },
+  };
 }
 
 function isMissingRowError(value: unknown): boolean {

@@ -11,10 +11,13 @@ import {
 export type { MemorySource, MemorySourceFilter };
 
 export const MEMORY_COLUMNS =
-  "id, persona_id, content, source, question_prompt, media_asset_id, is_private, created_at";
+  "id, persona_id, content, source, question_prompt, media_asset_id, visibility, created_at";
 
 const DEFAULT_PER_PAGE = 20;
 const MAX_PER_PAGE = 50;
+
+export type MemoryVisibility = "family" | "private" | "public";
+export type MemoryVisibilityFilter = "family" | "private";
 
 export type Memory = {
   id: string;
@@ -23,7 +26,7 @@ export type Memory = {
   source: MemorySource;
   question_prompt: string | null;
   media_asset_id: string | null;
-  is_private: boolean;
+  visibility: MemoryVisibility;
   created_at: string;
 };
 
@@ -38,14 +41,21 @@ export type ListMemoriesParams = {
   personaId: string;
   q?: string | null;
   source?: MemorySourceFilter | null;
+  visibility?: MemoryVisibilityFilter | null;
   page?: number;
   perPage?: number;
 };
 
-export type UpdateMemoryPrivacyParams = {
+export type MemoryStats = {
+  total: number;
+  by_source: Record<MemorySource, number>;
+  by_visibility: Record<MemoryVisibility, number>;
+};
+
+export type UpdateMemoryVisibilityParams = {
   personaId: string;
   memoryId: string;
-  isPrivate: boolean;
+  visibility: Extract<MemoryVisibility, "family" | "private">;
 };
 
 export type DeleteMemoryParams = {
@@ -86,6 +96,10 @@ export async function listMemories(
     query = query.eq("source", params.source);
   }
 
+  if (params.visibility) {
+    query = query.eq("visibility", params.visibility);
+  }
+
   const result = await query
     .order("created_at", { ascending: false })
     .range(from, to);
@@ -107,13 +121,50 @@ export async function listMemories(
   };
 }
 
-export async function updateMemoryPrivacy(
+export async function getMemoryStats(
   client: SupabaseClient,
-  params: UpdateMemoryPrivacyParams,
+  personaId: string,
+): Promise<MemoryStats> {
+  const result = await client
+    .from("memories")
+    .select("source, visibility")
+    .eq("persona_id", normalizeRequiredText(personaId, "personaId"));
+  const rows: unknown = result.data;
+
+  if (result.error) {
+    throw new MemoryDatabaseError("Failed to load memory stats.", result.error);
+  }
+
+  if (!Array.isArray(rows)) {
+    throw new MemoryDatabaseError("Supabase returned invalid memory stats.", rows);
+  }
+
+  const bySource = createEmptySourceCounts();
+  const byVisibility = createEmptyVisibilityCounts();
+
+  for (const row of rows) {
+    if (!isRecord(row) || !isMemorySource(row.source) || !isMemoryVisibility(row.visibility)) {
+      throw new MemoryDatabaseError("Supabase returned invalid memory stats.", rows);
+    }
+
+    bySource[row.source] += 1;
+    byVisibility[row.visibility] += 1;
+  }
+
+  return {
+    total: rows.length,
+    by_source: bySource,
+    by_visibility: byVisibility,
+  };
+}
+
+export async function updateMemoryVisibility(
+  client: SupabaseClient,
+  params: UpdateMemoryVisibilityParams,
 ): Promise<Memory> {
   const result = await client
     .from("memories")
-    .update({ is_private: params.isPrivate })
+    .update({ visibility: params.visibility })
     .eq("persona_id", normalizeRequiredText(params.personaId, "personaId"))
     .eq("id", normalizeRequiredText(params.memoryId, "memoryId"))
     .select(MEMORY_COLUMNS)
@@ -175,9 +226,37 @@ function isMemory(value: unknown): value is Memory {
     isMemorySource(value.source) &&
     (typeof value.question_prompt === "string" || value.question_prompt === null) &&
     (typeof value.media_asset_id === "string" || value.media_asset_id === null) &&
-    typeof value.is_private === "boolean" &&
+    isMemoryVisibility(value.visibility) &&
     typeof value.created_at === "string"
   );
+}
+
+export function isMemoryVisibility(value: unknown): value is MemoryVisibility {
+  return value === "family" || value === "private" || value === "public";
+}
+
+export function isMemoryVisibilityFilter(
+  value: unknown,
+): value is MemoryVisibilityFilter {
+  return value === "family" || value === "private";
+}
+
+function createEmptySourceCounts(): Record<MemorySource, number> {
+  return {
+    diary: 0,
+    interview: 0,
+    media_caption: 0,
+    voice_memo: 0,
+    free_text: 0,
+  };
+}
+
+function createEmptyVisibilityCounts(): Record<MemoryVisibility, number> {
+  return {
+    family: 0,
+    private: 0,
+    public: 0,
+  };
 }
 
 function normalizeOptionalText(value: string | null | undefined): string | null {

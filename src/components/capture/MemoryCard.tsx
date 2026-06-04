@@ -6,7 +6,7 @@ import {
   formatMemoryRelativeDate,
   formatMemorySourceLabel,
 } from "@/components/capture/memory-browser-utils";
-import type { Memory } from "@/lib/supabase/memories";
+import type { Memory, MemoryVisibility } from "@/lib/supabase/memories";
 
 type MemoryCardProps = {
   memory: Memory;
@@ -21,9 +21,9 @@ const collapsedContentStyle: CSSProperties = {
 };
 
 export default function MemoryCard({ memory, personaSlug }: MemoryCardProps) {
-  const [isPrivate, setIsPrivate] = useState(memory.is_private);
+  const [visibility, setVisibility] = useState(memory.visibility);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+  const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
@@ -34,13 +34,14 @@ export default function MemoryCard({ memory, personaSlug }: MemoryCardProps) {
   }
 
   async function togglePrivacy() {
-    if (isUpdatingPrivacy || isDeleting) {
+    if (isUpdatingVisibility || isDeleting) {
       return;
     }
 
-    const nextPrivate = !isPrivate;
-    setIsPrivate(nextPrivate);
-    setIsUpdatingPrivacy(true);
+    const previousVisibility = visibility;
+    const nextVisibility = visibility === "private" ? "family" : "private";
+    setVisibility(nextVisibility);
+    setIsUpdatingVisibility(true);
     setErrorMessage(null);
 
     try {
@@ -51,21 +52,21 @@ export default function MemoryCard({ memory, personaSlug }: MemoryCardProps) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ is_private: nextPrivate }),
+          body: JSON.stringify({ visibility: nextVisibility }),
         },
       );
       const body: unknown = await response.json();
 
-      if (!response.ok || !isMemoryPrivacyResponse(body)) {
-        throw new Error("Privacy update failed.");
+      if (!response.ok || !isMemoryVisibilityResponse(body)) {
+        throw new Error("Visibility update failed.");
       }
 
-      setIsPrivate(body.is_private);
+      setVisibility(body.visibility);
     } catch {
-      setIsPrivate(!nextPrivate);
-      setErrorMessage("Privacy could not be updated.");
+      setVisibility(previousVisibility);
+      setErrorMessage("Visibility could not be updated.");
     } finally {
-      setIsUpdatingPrivacy(false);
+      setIsUpdatingVisibility(false);
     }
   }
 
@@ -106,11 +107,15 @@ export default function MemoryCard({ memory, personaSlug }: MemoryCardProps) {
             </span>
             <span>{formatMemoryRelativeDate(memory.created_at)}</span>
             {memory.question_prompt ? <span>Prompted</span> : null}
-            {isPrivate ? (
+            {visibility === "private" ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
                 Private
               </span>
-            ) : null}
+            ) : (
+              <span className="rounded-full bg-teal-100 px-2.5 py-1 font-medium text-teal-800 dark:bg-teal-950 dark:text-teal-200">
+                Family
+              </span>
+            )}
           </div>
 
           <p
@@ -139,12 +144,12 @@ export default function MemoryCard({ memory, personaSlug }: MemoryCardProps) {
           <button
             type="button"
             onClick={togglePrivacy}
-            disabled={isUpdatingPrivacy || isDeleting}
+            disabled={isUpdatingVisibility || isDeleting}
             className="inline-flex min-h-10 items-center gap-2 rounded-md border border-stone-300 px-3 text-sm font-medium text-stone-700 transition hover:border-stone-500 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-400 dark:border-zinc-700 dark:text-zinc-200 dark:hover:border-zinc-500 dark:hover:bg-zinc-800 dark:disabled:text-zinc-500"
-            aria-pressed={isPrivate}
+            aria-pressed={visibility === "private"}
           >
-            {isPrivate ? <EyeOffIcon /> : <EyeIcon />}
-            {isPrivate ? "Private" : "Visible"}
+            {visibility === "private" ? <EyeOffIcon /> : <EyeIcon />}
+            {visibility === "private" ? "Private" : "Family"}
           </button>
 
           {isConfirmingDelete ? (
@@ -173,7 +178,7 @@ export default function MemoryCard({ memory, personaSlug }: MemoryCardProps) {
             <button
               type="button"
               onClick={() => setIsConfirmingDelete(true)}
-              disabled={isUpdatingPrivacy || isDeleting}
+              disabled={isUpdatingVisibility || isDeleting}
               className="min-h-10 rounded-md border border-red-200 px-3 text-sm font-medium text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-red-300 dark:border-red-900 dark:text-red-300 dark:hover:border-red-800 dark:hover:bg-red-950 dark:disabled:text-red-900"
             >
               Delete
@@ -223,8 +228,14 @@ function EyeOffIcon() {
   );
 }
 
-function isMemoryPrivacyResponse(value: unknown): value is { is_private: boolean } {
-  return isRecord(value) && typeof value.is_private === "boolean";
+function isMemoryVisibilityResponse(
+  value: unknown,
+): value is { visibility: MemoryVisibility } {
+  return isRecord(value) && isMemoryVisibility(value.visibility);
+}
+
+function isMemoryVisibility(value: unknown): value is MemoryVisibility {
+  return value === "family" || value === "private" || value === "public";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

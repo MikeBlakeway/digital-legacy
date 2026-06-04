@@ -39,19 +39,13 @@ export default function ChatWindow({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [voiceWarning, setVoiceWarning] = useState<string | null>(null)
-  const [latestAudioUrl, setLatestAudioUrl] = useState<string | null>(null)
+  const [latestAudioUrl, setLatestAudioUrl] = useState<string | null>(() =>
+    findLatestAudioUrl(initialMessages)
+  )
   const [isVoiceMode, setIsVoiceMode] = useState(false)
   const [currentConversationId, setCurrentConversationId] =
     useState(conversationId)
   const bottomRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const latestAssistantAudio = [...messages]
-      .reverse()
-      .find((message) => message.role === 'assistant' && message.audio_url)
-
-    setLatestAudioUrl(latestAssistantAudio?.audio_url ?? null)
-  }, [messages])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -239,6 +233,14 @@ function TypingIndicator() {
       />
     </div>
   )
+}
+
+function findLatestAudioUrl(messages: ChatMessageRecord[]): string | null {
+  const latestAssistantAudio = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.audio_url)
+
+  return latestAssistantAudio?.audio_url ?? null
 }
 
 function isChatResponse(value: unknown): value is ChatResponse {

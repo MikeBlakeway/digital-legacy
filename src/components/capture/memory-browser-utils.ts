@@ -6,6 +6,8 @@ import {
 
 export { isMemorySourceFilter };
 
+export type MemoryVisibilityFilter = "family" | "private";
+
 export type MemoryBrowserSearchParams = Record<
   string,
   string | string[] | undefined
@@ -14,6 +16,7 @@ export type MemoryBrowserSearchParams = Record<
 export type NormalizedMemoryBrowserParams = {
   q: string | null;
   source: MemorySourceFilter | null;
+  visibility: MemoryVisibilityFilter | null;
   page: number;
   perPage: number;
 };
@@ -29,10 +32,12 @@ export function normalizeMemoryBrowserParams(
 ): NormalizedMemoryBrowserParams {
   const q = normalizeSearchText(readSingleParam(params.q));
   const source = readSingleParam(params.source);
+  const visibility = readSingleParam(params.visibility);
 
   return {
     q,
     source: isMemorySourceFilter(source) ? source : null,
+    visibility: isMemoryVisibilityFilter(visibility) ? visibility : null,
     page: readPositiveInteger(readSingleParam(params.page), 1),
     perPage: Math.min(
       readPositiveInteger(readSingleParam(params.per_page), DEFAULT_PER_PAGE),
@@ -48,7 +53,7 @@ export function formatMemorySourceLabel(source: MemorySource): string {
     case "interview":
       return "Interview";
     case "media_caption":
-      return "Media";
+      return "Photos";
     case "voice_memo":
       return "Voice memo";
     case "free_text":
@@ -60,12 +65,14 @@ export function createMemoryPageHref({
   slug,
   q,
   source,
+  visibility,
   page,
   perPage,
 }: {
   slug: string;
   q: string | null;
   source: MemorySourceFilter | null;
+  visibility: MemoryVisibilityFilter | null;
   page: number;
   perPage: number;
 }): string {
@@ -77,6 +84,10 @@ export function createMemoryPageHref({
 
   if (source) {
     params.set("source", source);
+  }
+
+  if (visibility) {
+    params.set("visibility", visibility);
   }
 
   if (page > 1) {
@@ -148,4 +159,10 @@ function readPositiveInteger(value: string | null, fallback: number): number {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function isMemoryVisibilityFilter(
+  value: unknown,
+): value is MemoryVisibilityFilter {
+  return value === "family" || value === "private";
 }

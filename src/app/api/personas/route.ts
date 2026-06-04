@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   createPersona,
   getPersonaBySlug,
+  listAccessiblePersonas,
   PersonaDatabaseError,
 } from "@/lib/supabase/personas";
 import {
@@ -24,6 +25,28 @@ type CreatePersonaRequest = {
 type InvalidRequest = {
   fields: Record<string, string>;
 };
+
+export async function GET() {
+  const supabase = await createServerClient();
+  const claimsResult = await supabase.auth.getClaims();
+  const userId = readUserId(claimsResult.data?.claims);
+
+  if (claimsResult.error || !userId) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const personas = await listAccessiblePersonas(createServiceRoleClient(), userId);
+    return NextResponse.json({ personas });
+  } catch (error) {
+    if (error instanceof PersonaDatabaseError) {
+      console.error("Failed to list personas.", error);
+      return NextResponse.json({ error: "list_failed" }, { status: 500 });
+    }
+
+    throw error;
+  }
+}
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerClient();

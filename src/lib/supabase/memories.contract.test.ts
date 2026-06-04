@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   deleteMemory,
   listMemories,
-  updateMemoryPrivacy,
+  updateMemoryVisibility,
   type Memory,
 } from "@/lib/supabase/memories";
 
@@ -34,7 +34,7 @@ const memoryRow: Memory = {
   source: "diary",
   question_prompt: null,
   media_asset_id: null,
-  is_private: false,
+  visibility: "family",
   created_at: "2026-01-02T10:00:00.000Z",
 };
 
@@ -63,7 +63,7 @@ async function run() {
     {
       method: "select",
       columns:
-        "id, persona_id, content, source, question_prompt, media_asset_id, is_private, created_at",
+        "id, persona_id, content, source, question_prompt, media_asset_id, visibility, created_at",
       options: { count: "exact" },
     },
     { method: "eq", column: "persona_id", value: personaId },
@@ -74,25 +74,25 @@ async function run() {
   ]);
 
   const updateClient = createMemoryClient({
-    data: { ...memoryRow, is_private: true },
+    data: { ...memoryRow, visibility: "private" },
     count: null,
   });
-  const updated = await updateMemoryPrivacy(updateClient.client, {
+  const updated = await updateMemoryVisibility(updateClient.client, {
     personaId,
     memoryId,
-    isPrivate: true,
+    visibility: "private",
   });
 
-  assert.equal(updated.is_private, true);
+  assert.equal(updated.visibility, "private");
   assert.deepEqual(updateClient.calls, [
     { method: "from", table: "memories" },
-    { method: "update", values: { is_private: true } },
+    { method: "update", values: { visibility: "private" } },
     { method: "eq", column: "persona_id", value: personaId },
     { method: "eq", column: "id", value: memoryId },
     {
       method: "select",
       columns:
-        "id, persona_id, content, source, question_prompt, media_asset_id, is_private, created_at",
+        "id, persona_id, content, source, question_prompt, media_asset_id, visibility, created_at",
     },
     { method: "single" },
   ]);

@@ -9,9 +9,9 @@
 
 ## 1. Project Overview
 
-Digital Legacy is a private, self-hosted web application that captures a person's personality, voice, memories, and values, and makes them accessible to future generations through natural conversation with an AI persona trained on that person's data.
+Digital Legacy is a web application for building a lifelong AI persona. A subject captures their personality, voice, memories, and values over time — through structured interviews, voice recordings, uploaded media, and free-form diary entries. The resulting persona is made accessible to others through natural voice and text conversation with an AI trained on that person's data.
 
-Each subject (a living person) builds their persona over time through structured interviews, voice recordings, uploaded media, and free-form memory entries. After the subject's death, authorised family members can hold voice and text conversations with an AI representation of that person — asking questions, hearing stories, and viewing photos and videos surfaced contextually by the persona.
+Access to a persona is configurable: private to the subject only, shared with invited family members, or (in future) publicly discoverable. The post-death family access use case is the initial focus, but the system is designed around a privacy-by-default model that supports multiple access tiers over the persona's lifetime.
 
 The system is designed for long-term durability, minimal ongoing cost, and complete data sovereignty. No third-party AI service processes personal data. All inference runs on private GPU infrastructure.
 
@@ -41,7 +41,7 @@ The system is designed for long-term durability, minimal ongoing cost, and compl
 - Each persona is isolated: separate memory corpus, voice model, LoRA adapter, and conversation history
 - A subject can view, edit, and delete any of their own memories
 - A subject can review what the model "knows" about them via a memory browser
-- Personas are not publicly discoverable; access is invitation-only
+- Personas default to `private` visibility. Access tiers are `private` (subject only), `invite_only` (explicitly granted family members), and `public` (discoverable by anyone). For MVP all personas are `invite_only`; public personas are a future state
 
 ### 2.2 Capture Mode (Subject-facing)
 
@@ -259,6 +259,7 @@ birth_place      text nullable
 locations_lived  text[] nullable     -- ordered, most recent last
 lora_adapter_key text                -- B2 path to current adapter
 voice_sample_key text                -- B2 path to neutral voice reference file
+visibility       text NOT NULL DEFAULT 'invite_only'  -- 'private' | 'invite_only' | 'public'
 created_at       timestamptz
 updated_at       timestamptz
 ```
@@ -276,9 +277,11 @@ source           enum                -- interview | voice_memo | free_text | med
 question_prompt  text nullable       -- originating interview question if applicable
 embedding        vector(768)         -- nomic-embed-text output
 media_asset_id   uuid nullable FK → media_assets
-is_private       boolean default false
+visibility       text NOT NULL DEFAULT 'family'  -- 'private' | 'family' | 'public'
 created_at       timestamptz
 ```
+
+> **Migration note:** the original `is_private boolean` column must be replaced by `visibility text`. Migration SQL: `ALTER TABLE memories DROP COLUMN is_private, ADD COLUMN visibility text NOT NULL DEFAULT 'family' CHECK (visibility IN ('private', 'family', 'public'))`. All RLS policies, RAG retrieval queries, and memory-writing routes must be updated to filter on `visibility != 'private'` rather than `is_private = false`.
 
 **`media_assets`**
 Photos and videos uploaded by a subject.
@@ -341,6 +344,8 @@ granted_by       uuid FK → auth.users
 granted_at       timestamptz
 PRIMARY KEY (persona_id, user_id)
 ```
+
+> **Convention:** `granted_by` means "the user who granted this access" — not necessarily an admin. Do not write code that assumes it is always an admin. When subjects manage their own invitation lists in future, `granted_by` will be the subject's `user_id`.
 
 **`diary_entries`**
 Raw diary entries — text, voice, or both. Feeds the trait inference pipeline and produces memories for RAG.
@@ -553,7 +558,7 @@ Here are some things you remember that are relevant to this conversation:
 ...
 ```
 
-Omitted entirely if no memories are retrieved. Only memories with `is_private = false` are eligible.
+Omitted entirely if no memories are retrieved. Only memories with `visibility != 'private'` are eligible for RAG retrieval.
 
 **3. Closing instruction**
 
@@ -723,6 +728,10 @@ HF_TOKEN=
 | 4 | What is the UI tone for the conversation screen? (ambient, minimal, photo-forward?) | Design | Open |
 | 5 | Should conversation history be injected into subsequent sessions, or start fresh each time? | Product | Open |
 | 6 | How are private memories (marked by subject as hidden from family) handled — excluded from RAG entirely, or excluded only from responses? | Privacy | Open |
+| 7 | What is the public interaction model? Can anonymous users converse with a public persona, or must they create an account? What are the moderation implications? | Product | Open |
+| 8 | What is the commercial model? Per-subject subscription? One-time purchase? Free for family, paid for public access? | Product | Open |
+| 9 | Should public-facing personas use a third-party AI (e.g. Claude API) rather than private GPU infrastructure, to handle variable public traffic cost-effectively? Or maintain the privacy-first local inference model? | Architecture | Open |
+| 10 | What is the product name? "Digital Legacy" is a working title. | Mike | Open |
 
 ---
 

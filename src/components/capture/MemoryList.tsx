@@ -2,7 +2,11 @@ import Link from "next/link";
 
 import MemoryCard from "@/components/capture/MemoryCard";
 import { createMemoryPageHref } from "@/components/capture/memory-browser-utils";
-import type { Memory, MemorySourceFilter } from "@/lib/supabase/memories";
+import type {
+  Memory,
+  MemorySourceFilter,
+  MemoryVisibilityFilter,
+} from "@/lib/supabase/memories";
 
 type MemoryListProps = {
   personaSlug: string;
@@ -12,6 +16,7 @@ type MemoryListProps = {
   perPage: number;
   q: string | null;
   source: MemorySourceFilter | null;
+  visibility: MemoryVisibilityFilter | null;
 };
 
 export default function MemoryList({
@@ -22,6 +27,7 @@ export default function MemoryList({
   perPage,
   q,
   source,
+  visibility,
 }: MemoryListProps) {
   if (memories.length === 0) {
     return (
@@ -61,6 +67,7 @@ export default function MemoryList({
                 slug: personaSlug,
                 q,
                 source,
+                visibility,
                 page: page - 1,
                 perPage,
               })}
@@ -80,6 +87,7 @@ export default function MemoryList({
                 slug: personaSlug,
                 q,
                 source,
+                visibility,
                 page: page + 1,
                 perPage,
               })}

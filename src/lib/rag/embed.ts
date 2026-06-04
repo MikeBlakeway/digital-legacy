@@ -23,7 +23,7 @@ export interface MemoryRecord {
   source: MemorySource;
   question_prompt: string | null;
   media_asset_id: string | null;
-  is_private: boolean;
+  visibility: "family" | "private" | "public";
   created_at: string;
 }
 
@@ -74,14 +74,14 @@ export async function upsertMemoryEmbedding(
     question_prompt: params.questionPrompt ?? null,
     embedding,
     media_asset_id: params.mediaAssetId ?? null,
-    is_private: params.isPrivate ?? false,
+    visibility: params.isPrivate ? "private" : "family",
   };
 
   const { data, error } = await params.supabase
     .from("memories")
     .upsert(row)
     .select(
-      "id, persona_id, content, source, question_prompt, media_asset_id, is_private, created_at",
+      "id, persona_id, content, source, question_prompt, media_asset_id, visibility, created_at",
     )
     .single();
 
@@ -134,9 +134,15 @@ function isMemoryRecord(value: unknown): value is MemoryRecord {
     isMemorySource(record.source) &&
     (typeof record.question_prompt === "string" || record.question_prompt === null) &&
     (typeof record.media_asset_id === "string" || record.media_asset_id === null) &&
-    typeof record.is_private === "boolean" &&
+    isMemoryVisibility(record.visibility) &&
     typeof record.created_at === "string"
   );
+}
+
+function isMemoryVisibility(
+  value: unknown,
+): value is "family" | "private" | "public" {
+  return value === "family" || value === "private" || value === "public";
 }
 
 function isMemorySource(value: unknown): value is MemorySource {

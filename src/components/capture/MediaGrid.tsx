@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type MediaAsset = {
   id: string;
@@ -28,12 +28,7 @@ export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
   const [editingCaption, setEditingCaption] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    void loadAssets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personaSlug, refreshKey]);
-
-  async function loadAssets() {
+  const loadAssets = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -44,16 +39,21 @@ export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
       const payload: unknown = await response.json().catch(() => null);
 
       if (!response.ok || !isMediaListResponse(payload)) {
-        throw new Error("Media load failed.");
+        throw new Error("Photo load failed.");
       }
 
       setAssets(payload.assets);
     } catch {
-      setErrorMessage("Media could not be loaded.");
+      setErrorMessage("Photos could not be loaded.");
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [personaSlug]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadAssets();
+  }, [loadAssets, refreshKey]);
 
   async function saveCaption(assetId: string) {
     const trimmedCaption = editingCaption.trim();
@@ -104,7 +104,7 @@ export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
   if (isLoading) {
     return (
       <section className="rounded-lg border border-stone-200 bg-white p-5 text-sm text-stone-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-        Loading media...
+        Loading photos...
       </section>
     );
   }

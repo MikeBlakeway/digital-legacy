@@ -8,7 +8,13 @@ import {
   normalizeMemoryBrowserParams,
   type MemoryBrowserSearchParams,
 } from "@/components/capture/memory-browser-utils";
-import { listMemories, type MemorySourceFilter } from "@/lib/supabase/memories";
+import {
+  getMemoryStats,
+  listMemories,
+  type MemorySourceFilter,
+  type MemoryStats,
+  type MemoryVisibilityFilter,
+} from "@/lib/supabase/memories";
 import { getPersonaBySlug, type Persona } from "@/lib/supabase/personas";
 import {
   createClient as createServerClient,
@@ -28,7 +34,16 @@ const SOURCE_TABS: { label: string; source: MemorySourceFilter | null }[] = [
   { label: "All", source: null },
   { label: "Diary", source: "diary" },
   { label: "Interviews", source: "interview" },
-  { label: "Media", source: "media_caption" },
+  { label: "Photos", source: "media_caption" },
+];
+
+const VISIBILITY_TABS: {
+  label: string;
+  visibility: MemoryVisibilityFilter | null;
+}[] = [
+  { label: "All", visibility: null },
+  { label: "Family", visibility: "family" },
+  { label: "Private", visibility: "private" },
 ];
 
 export default async function MemoryBrowserPage({
@@ -39,13 +54,18 @@ export default async function MemoryBrowserPage({
   const query = await searchParams;
   const filters = normalizeMemoryBrowserParams(query);
   const persona = await getOwnedPersona(slug);
-  const result = await listMemories(createServiceRoleClient(), {
-    personaId: persona.id,
-    q: filters.q,
-    source: filters.source,
-    page: filters.page,
-    perPage: filters.perPage,
-  });
+  const serviceClient = createServiceRoleClient();
+  const [result, stats] = await Promise.all([
+    listMemories(serviceClient, {
+      personaId: persona.id,
+      q: filters.q,
+      source: filters.source,
+      visibility: filters.visibility,
+      page: filters.page,
+      perPage: filters.perPage,
+    }),
+    getMemoryStats(serviceClient, persona.id),
+  ]);
 
   return (
     <main className="flex flex-1 bg-stone-50 text-stone-950 dark:bg-zinc-950 dark:text-zinc-50">
@@ -62,7 +82,7 @@ export default async function MemoryBrowserPage({
               {persona.name} memories
             </h1>
             <p className="mt-3 text-sm text-stone-600 dark:text-zinc-300">
-              {formatTotal(result.total)}
+              {formatMemorySummary(stats)}
             </p>
           </div>
         </div>
@@ -72,6 +92,14 @@ export default async function MemoryBrowserPage({
             personaSlug={persona.slug}
             q={filters.q}
             currentSource={filters.source}
+            visibility={filters.visibility}
+            perPage={filters.perPage}
+          />
+          <VisibilityTabs
+            personaSlug={persona.slug}
+            q={filters.q}
+            source={filters.source}
+            currentVisibility={filters.visibility}
             perPage={filters.perPage}
           />
           <MemorySearch key={filters.q ?? ""} initialQuery={filters.q ?? ""} />
@@ -85,6 +113,7 @@ export default async function MemoryBrowserPage({
           perPage={result.per_page}
           q={filters.q}
           source={filters.source}
+          visibility={filters.visibility}
         />
       </section>
     </main>
@@ -95,11 +124,13 @@ function SourceTabs({
   personaSlug,
   q,
   currentSource,
+  visibility,
   perPage,
 }: {
   personaSlug: string;
   q: string | null;
   currentSource: MemorySourceFilter | null;
+  visibility: MemoryVisibilityFilter | null;
   perPage: number;
 }) {
   return (
@@ -117,6 +148,54 @@ function SourceTabs({
               slug: personaSlug,
               q,
               source: tab.source,
+              visibility,
+              page: 1,
+              perPage,
+            })}
+            aria-current={isActive ? "page" : undefined}
+            className={
+              isActive
+                ? "whitespace-nowrap rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-950"
+                : "whitespace-nowrap rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-stone-500 hover:bg-stone-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:border-zinc-500 dark:hover:bg-zinc-800"
+            }
+          >
+            {tab.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+function VisibilityTabs({
+  personaSlug,
+  q,
+  source,
+  currentVisibility,
+  perPage,
+}: {
+  personaSlug: string;
+  q: string | null;
+  source: MemorySourceFilter | null;
+  currentVisibility: MemoryVisibilityFilter | null;
+  perPage: number;
+}) {
+  return (
+    <nav
+      aria-label="Memory visibility filters"
+      className="flex gap-2 overflow-x-auto pb-1"
+    >
+      {VISIBILITY_TABS.map((tab) => {
+        const isActive = tab.visibility === currentVisibility;
+
+        return (
+          <Link
+            key={tab.label}
+            href={createMemoryPageHref({
+              slug: personaSlug,
+              q,
+              source,
+              visibility: tab.visibility,
               page: 1,
               perPage,
             })}
@@ -155,8 +234,12 @@ async function getOwnedPersona(slug: string): Promise<Persona> {
   return persona;
 }
 
-function formatTotal(total: number): string {
-  return `${total} ${total === 1 ? "memory" : "memories"}`;
+function formatMemorySummary(stats: MemoryStats): string {
+  const totalLabel = `${stats.total} ${stats.total === 1 ? "memory" : "memories"}`;
+  const sourceLabel = `${stats.by_source.diary} diary / ${stats.by_source.interview} interview / ${stats.by_source.media_caption} photos`;
+  const privateLabel = `${stats.by_visibility.private} private`;
+
+  return `${totalLabel} - ${sourceLabel} - ${privateLabel}`;
 }
 
 function readUserId(claims: unknown): string | null {

@@ -21,6 +21,12 @@ export type Persona = {
   updated_at: string;
 };
 
+export type PersonaAccessMode = "capture" | "conversation";
+
+export type AccessiblePersona = Persona & {
+  access_mode: PersonaAccessMode;
+};
+
 export type CreatePersonaData = {
   name: string;
   slug: string;
@@ -98,6 +104,89 @@ export async function getPersonasByOwner(
 
   if (result.error) {
     throw new PersonaDatabaseError("Failed to fetch personas by owner.", result.error);
+  }
+
+  if (!Array.isArray(personas)) {
+    throw new PersonaDatabaseError("Supabase returned invalid persona rows.", personas);
+  }
+
+  return personas.map(normalizePersona);
+}
+
+export async function listAccessiblePersonas(
+  client: SupabaseClient,
+  userId: string,
+): Promise<AccessiblePersona[]> {
+  const normalizedUserId = userId.trim();
+
+  if (!normalizedUserId) {
+    throw new Error("Persona userId must be non-empty.");
+  }
+
+  const ownedPersonas = await getPersonasByOwner(client, normalizedUserId);
+  const accessResult = await client
+    .from("persona_access")
+    .select("persona_id")
+    .eq("user_id", normalizedUserId);
+  const accessRows: unknown = accessResult.data;
+
+  if (accessResult.error) {
+    throw new PersonaDatabaseError(
+      "Failed to fetch granted persona access.",
+      accessResult.error,
+    );
+  }
+
+  if (!Array.isArray(accessRows)) {
+    throw new PersonaDatabaseError(
+      "Supabase returned invalid persona access rows.",
+      accessRows,
+    );
+  }
+
+  const grantedPersonaIds = accessRows.flatMap((row) => {
+    if (!isRecord(row) || typeof row.persona_id !== "string") {
+      throw new PersonaDatabaseError(
+        "Supabase returned invalid persona access rows.",
+        accessRows,
+      );
+    }
+
+    return ownedPersonas.some((persona) => persona.id === row.persona_id)
+      ? []
+      : [row.persona_id];
+  });
+
+  const grantedPersonas =
+    grantedPersonaIds.length === 0
+      ? []
+      : await getPersonasByIds(client, grantedPersonaIds);
+
+  return [
+    ...ownedPersonas.map((persona) => ({
+      ...persona,
+      access_mode: "capture" as const,
+    })),
+    ...grantedPersonas.map((persona) => ({
+      ...persona,
+      access_mode: "conversation" as const,
+    })),
+  ];
+}
+
+async function getPersonasByIds(
+  client: SupabaseClient,
+  personaIds: string[],
+): Promise<Persona[]> {
+  const result = await client
+    .from("personas")
+    .select(PERSONA_COLUMNS)
+    .in("id", personaIds)
+    .order("created_at", { ascending: false });
+  const personas: unknown = result.data;
+
+  if (result.error) {
+    throw new PersonaDatabaseError("Failed to fetch personas by id.", result.error);
   }
 
   if (!Array.isArray(personas)) {

@@ -26,6 +26,13 @@ export type ConversationMessage = {
   created_at: string
 }
 
+export type ConversationListItem = Conversation & {
+  message_count: number
+  first_user_message: string | null
+  latest_message_preview: string | null
+  latest_message_at: string | null
+}
+
 export type CreateConversationData = {
   personaId: string
   userId: string
@@ -118,6 +125,58 @@ export async function getLatestConversation(
   return row === null ? null : normalizeConversation(row)
 }
 
+export async function listConversationsForPersonaUser(
+  client: SupabaseClient,
+  params: { personaId: string; userId: string; limit?: number }
+): Promise<ConversationListItem[]> {
+  const query = client
+    .from('conversations')
+    .select(CONVERSATION_COLUMNS)
+    .eq('persona_id', normalizeRequiredText(params.personaId, 'personaId'))
+    .eq('user_id', normalizeRequiredText(params.userId, 'userId'))
+    .order('updated_at', { ascending: false })
+
+  const result =
+    params.limit === undefined ? await query : await query.limit(params.limit)
+  const rows: unknown = result.data
+
+  if (result.error) {
+    throw new ConversationDatabaseError(
+      'Failed to list conversations.',
+      result.error
+    )
+  }
+
+  if (!Array.isArray(rows)) {
+    throw new ConversationDatabaseError(
+      'Supabase returned invalid conversations.',
+      rows
+    )
+  }
+
+  return Promise.all(
+    rows.map(async (row) => {
+      const conversation = normalizeConversation(row)
+      const messages = await listConversationMessages(client, conversation.id)
+      const firstUserMessage =
+        messages.find((message) => message.role === 'user')?.content ?? null
+      const latestMessage = messages[messages.length - 1]
+
+      return {
+        ...conversation,
+        message_count: messages.length,
+        first_user_message: firstUserMessage
+          ? createConversationPreview(firstUserMessage)
+          : null,
+        latest_message_preview: latestMessage
+          ? createConversationPreview(latestMessage.content)
+          : null,
+        latest_message_at: latestMessage?.created_at ?? null
+      }
+    })
+  )
+}
+
 export async function listConversationMessages(
   client: SupabaseClient,
   conversationId: string
@@ -147,6 +206,16 @@ export async function listConversationMessages(
   }
 
   return rows.map(normalizeConversationMessage)
+}
+
+function createConversationPreview(text: string): string {
+  const normalized = text.trim().replace(/\s+/g, ' ')
+
+  if (!normalized) {
+    return ''
+  }
+
+  return normalized.length > 120 ? `${normalized.slice(0, 117)}...` : normalized
 }
 
 export async function insertConversationMessage(

@@ -31,6 +31,11 @@ export type ListMediaAssetsParams = {
   personaId: string;
 };
 
+export type MediaStats = {
+  total_photos: number;
+  captioned_photos: number;
+};
+
 export type UpdateMediaCaptionData = {
   personaId: string;
   mediaId: string;
@@ -93,6 +98,43 @@ export async function listMediaAssets(
   }
 
   return rows.map(normalizeMediaAsset);
+}
+
+export async function getMediaStats(
+  client: SupabaseClient,
+  personaId: string,
+): Promise<MediaStats> {
+  const result = await client
+    .from("media_assets")
+    .select("caption_status")
+    .eq("persona_id", normalizeRequiredText(personaId, "personaId"))
+    .eq("media_type", "photo");
+  const rows: unknown = result.data;
+
+  if (result.error) {
+    throw new MediaDatabaseError("Failed to load media stats.", result.error);
+  }
+
+  if (!Array.isArray(rows)) {
+    throw new MediaDatabaseError("Supabase returned invalid media stats.", rows);
+  }
+
+  let captionedPhotos = 0;
+
+  for (const row of rows) {
+    if (!isRecord(row) || !isCaptionStatus(row.caption_status)) {
+      throw new MediaDatabaseError("Supabase returned invalid media stats.", rows);
+    }
+
+    if (row.caption_status !== "pending") {
+      captionedPhotos += 1;
+    }
+  }
+
+  return {
+    total_photos: rows.length,
+    captioned_photos: captionedPhotos,
+  };
 }
 
 export async function updateMediaCaption(
