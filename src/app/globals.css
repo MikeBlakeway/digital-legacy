@@ -1,28 +1,236 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ============================================================
+   DIGITAL LEGACY — DESIGN TOKENS · "THE ARCHIVE"
+   Warm white · ink · oxblood sealing wax · amber
+   Manrope · IBM Plex Mono
+   ============================================================ */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  /* ── FONTS ──────────────────────────────────────────────── */
+  --font-sans: var(--font-manrope), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* ── RAW PALETTE ────────────────────────────────────────── */
+
+  /* Warm neutrals */
+  --color-paper:      #f9f8f6;
+  --color-page:       #ffffff;
+  --color-warm-100:   #f4f2ef;
+  --color-warm-200:   #e8e4de;
+  --color-warm-300:   #d9d4cd;
+
+  /* Ink scale */
+  --color-ink:        #1e1a17;
+  --color-ink-soft:   #3a332c;
+  --color-stone-600:  #4f463d;
+  --color-stone-500:  #6b6056;
+  --color-stone-400:  #8a7f72;
+  --color-stone-300:  #b8ac9c;
+  --color-fg-faint:   #c8bcac;
+
+  /* Brand: sealing wax */
+  --color-wax:        #8a2f29;
+  --color-wax-deep:   #6f231e;
+  --color-wax-soft:   #f0e0dc;
+  --color-wax-fg:     #f6efe6;
+
+  /* Accent: amber — memories only */
+  --color-amber:      #c0822a;
+  --color-amber-soft: #f6ead2;
+  --color-amber-fg:   #7a4e0e;
+
+  /* Semantic source hues */
+  --color-green:      #4f6f52;
+  --color-red:        #8a2f29;
+
+  /* ── TYPE SCALE ─────────────────────────────────────────── */
+  --text-display: 3.25rem;   /* 52px — hero name */
+  --text-h1:      2.25rem;   /* 36px */
+  --text-h2:      1.625rem;  /* 26px */
+  --text-h3:      1.1875rem; /* 19px */
+  --text-lg:      1.125rem;  /* 18px */
+  --text-base:    1rem;      /* 16px */
+  --text-sm:      0.875rem;  /* 14px — UI default */
+  --text-xs:      0.75rem;   /* 12px — eyebrow / meta */
+
+  /* ── SHAPE ──────────────────────────────────────────────── */
+  --radius-sm:   5px;
+  --radius:      8px;
+  --radius-lg:   12px;
+  --radius-full: 9999px;
+
+  /* ── SHADOWS ────────────────────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(30,26,23,0.05);
+  --shadow-md: 0 2px 8px -2px rgba(30,26,23,0.09);
+  --shadow-lg: 0 10px 30px -8px rgba(30,26,23,0.14);
+
+  /* ── MOTION ─────────────────────────────────────────────── */
+  --ease:     cubic-bezier(0.22, 0.61, 0.36, 1);
+  --duration: 180ms;
+  --duration-slow: 320ms;
+
+  /* ── SEMANTIC TOKENS (light) ────────────────────────────── */
+  --color-bg:             var(--color-paper);
+  --color-surface:        var(--color-page);
+  --color-surface-2:      var(--color-warm-100);
+  --color-surface-3:      var(--color-warm-200);
+
+  --color-fg1:            var(--color-ink);
+  --color-fg2:            var(--color-stone-600);
+  --color-fg3:            var(--color-stone-500);
+  --color-fg4:            var(--color-stone-400);
+
+  --color-border:         var(--color-warm-200);
+  --color-border-strong:  var(--color-warm-300);
+  --color-border-hover:   var(--color-stone-400);
+
+  --color-primary:        var(--color-ink);
+  --color-primary-hover:  var(--color-ink-soft);
+  --color-primary-fg:     #faf7f1;
+
+  --color-accent:         var(--color-wax);
+  --color-accent-hover:   var(--color-wax-deep);
+  --color-accent-soft:    var(--color-wax-soft);
+  --color-accent-fg:      var(--color-wax-fg);
+
+  --color-memory:         var(--color-amber);
+  --color-memory-soft:    var(--color-amber-soft);
+  --color-memory-fg:      var(--color-amber-fg);
+
+  --color-success:        var(--color-green);
+  --color-danger:         var(--color-wax);
+  --color-caution:        var(--color-amber);
+}
+
+/* ── CSS CUSTOM PROPERTIES (accessible to non-Tailwind CSS) ── */
+:root {
+  --bg:             #f9f8f6;
+  --surface:        #ffffff;
+  --surface-2:      #f4f2ef;
+  --surface-3:      #e8e4de;
+  --fg1:            #1e1a17;
+  --fg2:            #4f463d;
+  --fg3:            #6b6056;
+  --fg4:            #8a7f72;
+  --fg-faint:       #c8bcac;
+  --border:         #e8e4de;
+  --border-strong:  #d9d4cd;
+  --border-hover:   #8a7f72;
+  --primary:        #1e1a17;
+  --primary-hover:  #3a332c;
+  --primary-fg:     #faf7f1;
+  --accent:         #8a2f29;
+  --accent-hover:   #6f231e;
+  --accent-soft:    #f0e0dc;
+  --accent-fg:      #f6efe6;
+  --memory:         #c0822a;
+  --memory-soft:    #f6ead2;
+  --memory-fg:      #7a4e0e;
+  --ring:           color-mix(in srgb, #1e1a17 12%, transparent);
+  --success:        #4f6f52;
+  --danger:         #8a2f29;
+  --caution:        #c0822a;
+
+  /* shape */
+  --radius-sm:      5px;
+  --radius:         8px;
+  --radius-lg:      12px;
+  --radius-full:    9999px;
+
+  /* shadow */
+  --shadow-sm:      0 1px 2px rgba(30,26,23,0.05);
+  --shadow:         0 2px 8px -2px rgba(30,26,23,0.09);
+  --shadow-md:      0 10px 30px -8px rgba(30,26,23,0.14);
+
+  /* motion */
+  --ease:           cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur:            180ms;
+  --dur-slow:       320ms;
+
+  /* legacy aliases — kept so existing stone/zinc Tailwind classes continue working */
+  --background:     #f9f8f6;
+  --foreground:     #1e1a17;
+}
+
+/* ── DARK MODE ───────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:             #18130f;
+  --surface:        #211b16;
+  --surface-2:      #2b2219;
+  --surface-3:      #392d20;
+  --fg1:            #f3ece0;
+  --fg2:            #d8cdbd;
+  --fg3:            #b3a796;
+  --fg4:            #8f8373;
+  --fg-faint:       #5b5040;
+  --border:         #322820;
+  --border-strong:  #463829;
+  --border-hover:   #6a5a45;
+  --primary:        #f3ece0;
+  --primary-hover:  #ffffff;
+  --primary-fg:     #18130f;
+  --accent:         #d98d6a;
+  --accent-soft:    #3a241d;
+  --accent-fg:      #f3ece0;
+  --memory:         #d9a441;
+  --memory-soft:    #3a2c12;
+  --memory-fg:      #f3ece0;
+  --ring:           color-mix(in srgb, #f3ece0 18%, transparent);
+
+  /* legacy aliases */
+  --background:     #18130f;
+  --foreground:     #f3ece0;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --bg:             #18130f;
+    --surface:        #211b16;
+    --surface-2:      #2b2219;
+    --surface-3:      #392d20;
+    --fg1:            #f3ece0;
+    --fg2:            #d8cdbd;
+    --fg3:            #b3a796;
+    --fg4:            #8f8373;
+    --fg-faint:       #5b5040;
+    --border:         #322820;
+    --border-strong:  #463829;
+    --border-hover:   #6a5a45;
+    --primary:        #f3ece0;
+    --primary-hover:  #ffffff;
+    --primary-fg:     #18130f;
+    --accent:         #d98d6a;
+    --accent-soft:    #3a241d;
+    --accent-fg:      #f3ece0;
+    --memory:         #d9a441;
+    --memory-soft:    #3a2c12;
+    --memory-fg:      #f3ece0;
+    --ring:           color-mix(in srgb, #f3ece0 18%, transparent);
+    --background:     #18130f;
+    --foreground:     #f3ece0;
   }
 }
 
+/* ── BASE ELEMENT STYLES ────────────────────────────────── */
+html {
+  background: var(--bg);
+  color: var(--fg1);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--fg1);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
