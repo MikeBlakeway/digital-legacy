@@ -1,6 +1,6 @@
 # Digital Legacy
 
-A self-hosted platform for preserving a person's voice, memories, and personality — so that family members can continue to have conversations with them, long after they are gone.
+A self-hosted web application for preserving a person's personality, voice, memories, and values — and making them reachable by future generations through natural conversation with an AI persona.
 
 A *persona* is built from interviews, voice memos, diary entries, and photos. The system analyses that material to extract a personality model, embeds the memories into a vector store, and uses them to ground a fine-tuned LLM that speaks in that person's voice. Family members can then have text or voice conversations with the persona, with the system retrieving the most relevant memories on each turn and synthesising responses that sound — and, gradually, feel — like the person they knew.
 
