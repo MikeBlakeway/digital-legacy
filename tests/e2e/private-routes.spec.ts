@@ -68,3 +68,94 @@ test("authenticated account can reach a persona memory browser", async ({
   await expect(page.getByRole("searchbox", { name: "Search memories" })).toBeVisible();
   await expect(page.getByRole("link", { name: "All" })).toBeVisible();
 });
+
+test("authenticated account can reach the video archive", async ({ page }) => {
+  const personaSlug = getPersonaSlug();
+  test.skip(!personaSlug, "Set PLAYWRIGHT_TEST_PERSONA_SLUG to test video UI.");
+
+  await page.goto(`/capture/${personaSlug}/videos`);
+
+  await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
+  await expect(page.getByRole("heading", { name: /stories/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Record a video" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Choose existing videos" }),
+  ).toBeVisible();
+});
+
+test("video archive uploads a phone video directly and registers it", async ({
+  page,
+}) => {
+  const personaSlug = getPersonaSlug();
+  test.skip(!personaSlug, "Set PLAYWRIGHT_TEST_PERSONA_SLUG to test video upload.");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/upload/media", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        upload_url: "http://127.0.0.1:3001/test-b2-video-upload",
+        b2_key: "media/test-persona-id/test-video.mp4",
+      }),
+    });
+  });
+  await page.route("**/test-b2-video-upload", async (route) => {
+    await route.fulfill({ status: 200, body: "" });
+  });
+  await page.route(`**/api/personas/${personaSlug}/media*`, async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as {
+        media_type?: string;
+        taken_at?: string | null;
+      };
+      expect(body.media_type).toBe("video");
+      expect(body.taken_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ id: "test-video-id" }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ assets: [] }),
+    });
+  });
+
+  await page.goto(`/capture/${personaSlug}/videos`);
+  const libraryInput = page.locator('input[type="file"]').nth(1);
+  await libraryInput.setInputFiles({
+    name: "family-story.mp4",
+    mimeType: "video/mp4",
+    buffer: Buffer.from("test-video-content"),
+  });
+
+  await expect(page.getByText("family-story.mp4")).toBeVisible();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(page.getByText("No videos saved yet.")).toBeVisible();
+});
+
+test("authenticated owner can prepare a direct video upload", async ({ request }) => {
+  const personaSlug = getPersonaSlug();
+  test.skip(!personaSlug, "Set PLAYWRIGHT_TEST_PERSONA_SLUG to test video upload.");
+
+  const response = await request.post("/api/upload/media", {
+    data: {
+      persona_slug: personaSlug,
+      content_type: "video/mp4",
+      content_length: 1024,
+    },
+  });
+  const body = (await response.json()) as {
+    upload_url?: string;
+    b2_key?: string;
+  };
+
+  expect(response.status()).toBe(200);
+  expect(body.upload_url).toMatch(/^https:/);
+  expect(body.b2_key).toMatch(/\.mp4$/);
+});

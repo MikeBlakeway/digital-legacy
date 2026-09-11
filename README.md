@@ -13,7 +13,7 @@ A *persona* is built from interviews, voice memos, diary entries, and photos. Th
 Everything is organised around a `persona` — a named representation of a real person. Each persona owns:
 
 - **Memories** — text fragments from any source (interview answer, voice memo transcript, diary entry, photo caption), each stored with a 768-dimensional embedding and a privacy flag
-- **Media assets** — photos and videos in Backblaze B2 storage, with AI-generated captions that feed back into the memory store
+- **Media assets** — phone-first photo and video capture in Backblaze B2 storage, with private signed playback and captions or notes that feed back into the memory store
 - **Voice samples** — short WAV recordings used to clone the persona's voice for speech synthesis
 - **Conversations** — multi-turn conversation sessions; each message records which memories were retrieved to inform that response
 

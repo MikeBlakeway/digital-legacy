@@ -117,7 +117,7 @@ export default async function CaptureDashboardPage({
             </Link>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard
               label="Diary"
               value={`${diaryStats.total_entries} entries`}
@@ -132,6 +132,11 @@ export default async function CaptureDashboardPage({
               label="Photos"
               value={`${mediaStats.total_photos} photos`}
               detail={`${mediaStats.captioned_photos} captioned`}
+            />
+            <StatCard
+              label="Videos"
+              value={`${mediaStats.total_videos} videos`}
+              detail="Recorded and uploaded"
             />
             <StatCard
               label="Memories"
@@ -184,7 +189,7 @@ export default async function CaptureDashboardPage({
           <h2 id="quick-actions-heading" className="text-lg font-semibold">
             Quick actions
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <QuickAction
               href={`/capture/${persona.slug}/diary/new`}
               label="Write a diary entry"
@@ -199,6 +204,11 @@ export default async function CaptureDashboardPage({
               href={`/capture/${persona.slug}/photos`}
               label="Upload photos"
               detail="Add captions that become searchable memories."
+            />
+            <QuickAction
+              href={`/capture/${persona.slug}/videos`}
+              label="Record a video"
+              detail="Record now or add an existing video from your phone."
             />
           </div>
         </section>
