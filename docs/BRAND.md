@@ -144,12 +144,14 @@ custom properties or their Tailwind aliases.
 ## 4. Component patterns
 
 ### Cards
+
 ```html
 <div class="rounded-lg border border-[var(--border)] bg-[var(--surface)]
             p-5 shadow-sm transition hover:border-[var(--border-hover)]">
 ```
 
 ### Primary buttons
+
 ```html
 <button class="rounded-[var(--radius-sm)] bg-[var(--primary)] px-4 py-2
                text-sm font-semibold text-[var(--primary-fg)]
@@ -159,6 +161,7 @@ custom properties or their Tailwind aliases.
 ```
 
 ### Text inputs
+
 ```html
 <input class="w-full rounded-[var(--radius-sm)] border border-[var(--border-strong)]
               bg-[var(--surface)] px-3 py-2 text-sm
@@ -168,6 +171,7 @@ custom properties or their Tailwind aliases.
 ```
 
 ### Eyebrow labels
+
 ```html
 <span class="text-xs font-medium uppercase tracking-[0.12em] text-[var(--fg4)]">
   Section title
@@ -175,6 +179,7 @@ custom properties or their Tailwind aliases.
 ```
 
 ### Memory tags (amber — use sparingly)
+
 ```html
 <span class="rounded-full bg-[var(--memory-soft)] px-2 py-0.5
              text-xs font-medium text-[var(--memory-fg)]">
@@ -198,6 +203,8 @@ space allows.
 - Earned glyphs: `mic`, `square`, `play`, `pause`, `upload`, `image`, `search`,
   `chevron-left`, `arrow-left`, `x`, `volume-2`, `lock`.
 
+> **⚠ Implementation gap — emotion icons:** The design system's `preview/comp-chips-badges.html` originally showed bespoke SVG icons (sun, crescent, teardrop) for emotion chip labels — the intended design target. The production codebase (`src/lib/capture/emotions.ts`, `src/components/capture/diary/EmotionSelector.tsx`) currently uses emoji. The preview card has been updated to reflect the emoji implementation. Replacing the emoji with bespoke SVG icons is a future engineering task.
+
 ---
 
 ## 6. Writing style
@@ -219,7 +226,7 @@ space allows.
 
 - Family photographs are the heroes, especially in Conversation mode.
 - Present photos full-bleed or in soft-cornered frames (`--radius-lg`).
-- Warm, slightly faded register — think album, not gallery.
+- **Monochrome treatment.** Photos are presented without warm filters or sepia toning. The warm quality of the design comes from the paper-and-ink palette surrounding the image, not from photo treatment.
 - Chrome stays neutral so photographs sing.
 - Photo overlays: a bottom-up `var(--ink)` gradient scrim at low opacity only.
 
@@ -228,6 +235,7 @@ space allows.
 ## 8. Logo
 
 Logo files live in `/public/`:
+
 - `logo-light.svg` — for use on dark backgrounds
 - `logo-dark.svg` — for use on light backgrounds
 
