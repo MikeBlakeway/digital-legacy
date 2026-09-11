@@ -25,15 +25,18 @@ export type CreateMediaAssetData = {
   b2Key: string;
   uploadedBy: string;
   mediaType?: MediaType;
+  takenAt?: string | null;
 };
 
 export type ListMediaAssetsParams = {
   personaId: string;
+  mediaType?: MediaType;
 };
 
 export type MediaStats = {
   total_photos: number;
   captioned_photos: number;
+  total_videos: number;
 };
 
 export type UpdateMediaCaptionData = {
@@ -65,6 +68,7 @@ export async function createMediaAsset(
       media_type: data.mediaType ?? "photo",
       caption: null,
       caption_status: "pending",
+      taken_at: data.takenAt ?? null,
       uploaded_by: normalizeRequiredText(data.uploadedBy, "uploadedBy"),
     })
     .select(MEDIA_COLUMNS)
@@ -82,11 +86,16 @@ export async function listMediaAssets(
   client: SupabaseClient,
   params: ListMediaAssetsParams,
 ): Promise<MediaAsset[]> {
-  const result = await client
+  let query = client
     .from("media_assets")
     .select(MEDIA_COLUMNS)
-    .eq("persona_id", normalizeRequiredText(params.personaId, "personaId"))
-    .order("created_at", { ascending: false });
+    .eq("persona_id", normalizeRequiredText(params.personaId, "personaId"));
+
+  if (params.mediaType) {
+    query = query.eq("media_type", params.mediaType);
+  }
+
+  const result = await query.order("created_at", { ascending: false });
   const rows: unknown = result.data;
 
   if (result.error) {
@@ -106,9 +115,8 @@ export async function getMediaStats(
 ): Promise<MediaStats> {
   const result = await client
     .from("media_assets")
-    .select("caption_status")
-    .eq("persona_id", normalizeRequiredText(personaId, "personaId"))
-    .eq("media_type", "photo");
+    .select("media_type, caption_status")
+    .eq("persona_id", normalizeRequiredText(personaId, "personaId"));
   const rows: unknown = result.data;
 
   if (result.error) {
@@ -120,20 +128,33 @@ export async function getMediaStats(
   }
 
   let captionedPhotos = 0;
+  let totalPhotos = 0;
+  let totalVideos = 0;
 
   for (const row of rows) {
-    if (!isRecord(row) || !isCaptionStatus(row.caption_status)) {
+    if (
+      !isRecord(row) ||
+      !isMediaType(row.media_type) ||
+      !isCaptionStatus(row.caption_status)
+    ) {
       throw new MediaDatabaseError("Supabase returned invalid media stats.", rows);
     }
 
-    if (row.caption_status !== "pending") {
+    if (row.media_type === "video") {
+      totalVideos += 1;
+    } else {
+      totalPhotos += 1;
+    }
+
+    if (row.media_type === "photo" && row.caption_status !== "pending") {
       captionedPhotos += 1;
     }
   }
 
   return {
-    total_photos: rows.length,
+    total_photos: totalPhotos,
     captioned_photos: captionedPhotos,
+    total_videos: totalVideos,
   };
 }
 

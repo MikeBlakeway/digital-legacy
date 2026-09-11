@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { createPresignedUploadUrl } from "@/lib/b2/client";
+import {
+  extensionForContentType,
+  isMediaContentType,
+  maxFileBytesForMediaType,
+  mediaTypeForContentType,
+  type MediaContentType,
+} from "@/lib/media-upload";
 import { getPersonaBySlug } from "@/lib/supabase/personas";
 import {
   createClient as createServerClient,
@@ -8,20 +15,10 @@ import {
 } from "@/lib/supabase/server";
 
 const DEFAULT_EXPIRES_IN_SECONDS = 15 * 60;
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
-const ALLOWED_CONTENT_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-] as const;
-
-type AllowedContentType = (typeof ALLOWED_CONTENT_TYPES)[number];
 
 type UploadRequest = {
   persona_slug: string;
-  content_type: AllowedContentType;
+  content_type: MediaContentType;
   content_length: number;
 };
 
@@ -52,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  const extension = extensionForMime(parsed.content_type);
+  const extension = extensionForContentType(parsed.content_type);
   const b2Key = `media/${persona.id}/${crypto.randomUUID()}.${extension}`;
   const uploadUrl = await createPresignedUploadUrl({
     key: b2Key,
@@ -93,9 +90,11 @@ async function parseRequest(
     fields.persona_slug = "Persona slug is required.";
   }
 
-  if (!isAllowedContentType(contentType)) {
+  const mediaType = mediaTypeForContentType(contentType);
+
+  if (!mediaType) {
     fields.content_type =
-      "Content type must be jpeg, png, webp, heic, or heif.";
+      "Content type must be a supported photo or video format.";
   }
 
   if (
@@ -104,13 +103,19 @@ async function parseRequest(
     contentLength <= 0
   ) {
     fields.content_length = "Content length must be a positive integer.";
-  } else if (contentLength > MAX_FILE_BYTES) {
-    fields.content_length = "File size must be 20MB or smaller.";
+  } else if (
+    mediaType &&
+    contentLength > maxFileBytesForMediaType(mediaType)
+  ) {
+    fields.content_length =
+      mediaType === "video"
+        ? "Video size must be 2GB or smaller."
+        : "Photo size must be 20MB or smaller.";
   }
 
   if (
     Object.keys(fields).length > 0 ||
-    !isAllowedContentType(contentType) ||
+    !isMediaContentType(contentType) ||
     typeof contentLength !== "number"
   ) {
     return { fields };
@@ -121,26 +126,6 @@ async function parseRequest(
     content_type: contentType,
     content_length: contentLength,
   };
-}
-
-function extensionForMime(contentType: AllowedContentType): string {
-  switch (contentType) {
-    case "image/jpeg":
-      return "jpg";
-    case "image/png":
-      return "png";
-    case "image/webp":
-      return "webp";
-    case "image/heic":
-    case "image/heif":
-      return "heic";
-    default:
-      return "bin";
-  }
-}
-
-function isAllowedContentType(value: unknown): value is AllowedContentType {
-  return ALLOWED_CONTENT_TYPES.some((contentType) => contentType === value);
 }
 
 function readUserId(claims: unknown): string | null {

@@ -5,6 +5,7 @@ import {
   createMediaAsset,
   listMediaAssets,
   type MediaAsset,
+  type MediaType,
 } from "@/lib/supabase/media";
 import { getPersonaBySlug, type Persona } from "@/lib/supabase/personas";
 import {
@@ -20,10 +21,12 @@ type MediaRouteContext = {
 
 type CreateMediaRequest = {
   b2_key: string;
-  media_type?: "photo";
+  media_type: MediaType;
+  taken_at: string | null;
 };
 
-const URL_EXPIRES_IN_SECONDS = 15 * 60;
+const PHOTO_URL_EXPIRES_IN_SECONDS = 15 * 60;
+const VIDEO_URL_EXPIRES_IN_SECONDS = 4 * 60 * 60;
 
 export async function GET(_request: NextRequest, context: MediaRouteContext) {
   const resolved = await getOwnedPersona(context);
@@ -32,8 +35,12 @@ export async function GET(_request: NextRequest, context: MediaRouteContext) {
     return resolved.response;
   }
 
+  const requestedMediaType = readMediaType(
+    _request.nextUrl.searchParams.get("type"),
+  );
   const assets = await listMediaAssets(createServiceRoleClient(), {
     personaId: resolved.persona.id,
+    ...(requestedMediaType ? { mediaType: requestedMediaType } : {}),
   });
   const assetsWithUrls = await Promise.all(assets.map(withSignedUrl));
 
@@ -59,7 +66,8 @@ export async function POST(request: NextRequest, context: MediaRouteContext) {
   const asset = await createMediaAsset(createServiceRoleClient(), {
     personaId: resolved.persona.id,
     b2Key: parsed.b2_key,
-    mediaType: "photo",
+    mediaType: parsed.media_type,
+    takenAt: parsed.taken_at,
     uploadedBy: resolved.userId,
   });
 
@@ -110,7 +118,8 @@ async function parseCreateRequest(
 
   const fields: Record<string, string> = {};
   const b2Key = typeof body.b2_key === "string" ? body.b2_key.trim() : "";
-  const mediaType = body.media_type;
+  const mediaType = body.media_type ?? "photo";
+  const takenAt = body.taken_at;
 
   if (!b2Key) {
     fields.b2_key = "B2 key is required.";
@@ -120,30 +129,50 @@ async function parseCreateRequest(
     fields.b2_key = "Media key is not valid for this persona.";
   }
 
-  if (mediaType !== undefined && mediaType !== "photo") {
-    fields.media_type = "Only photo media type is supported.";
+  if (!isMediaType(mediaType)) {
+    fields.media_type = "Media type must be photo or video.";
   }
 
-  if (Object.keys(fields).length > 0) {
+  if (
+    takenAt !== undefined &&
+    takenAt !== null &&
+    (typeof takenAt !== "string" || Number.isNaN(Date.parse(takenAt)))
+  ) {
+    fields.taken_at = "Taken at must be a valid date.";
+  }
+
+  if (Object.keys(fields).length > 0 || !isMediaType(mediaType)) {
     return { fields };
   }
 
   return {
     b2_key: b2Key,
-    ...(mediaType === "photo" ? { media_type: "photo" as const } : {}),
+    media_type: mediaType,
+    taken_at: typeof takenAt === "string" ? new Date(takenAt).toISOString() : null,
   };
 }
 
 async function withSignedUrl(asset: MediaAsset) {
   const url = await createPresignedDownloadUrl({
     key: asset.b2_key,
-    expiresInSeconds: URL_EXPIRES_IN_SECONDS,
+    expiresInSeconds:
+      asset.media_type === "video"
+        ? VIDEO_URL_EXPIRES_IN_SECONDS
+        : PHOTO_URL_EXPIRES_IN_SECONDS,
   });
 
   return {
     ...asset,
     url,
   };
+}
+
+function readMediaType(value: string | null): MediaType | null {
+  return isMediaType(value) ? value : null;
+}
+
+function isMediaType(value: unknown): value is MediaType {
+  return value === "photo" || value === "video";
 }
 
 function readUserId(claims: unknown): string | null {

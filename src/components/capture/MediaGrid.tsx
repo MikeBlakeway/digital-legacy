@@ -5,8 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 type MediaAsset = {
   id: string;
   b2_key: string;
+  media_type: "photo" | "video";
   caption: string | null;
   caption_status: string;
+  taken_at: string | null;
   created_at: string;
   url: string;
 };
@@ -18,9 +20,14 @@ type MediaListResponse = {
 type MediaGridProps = {
   personaSlug: string;
   refreshKey: number;
+  mediaType?: "photo" | "video";
 };
 
-export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
+export default function MediaGrid({
+  personaSlug,
+  refreshKey,
+  mediaType = "photo",
+}: MediaGridProps) {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,22 +40,26 @@ export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
     setErrorMessage(null);
 
     try {
-      const response = await fetch(`/api/personas/${personaSlug}/media`, {
+      const response = await fetch(`/api/personas/${personaSlug}/media?type=${mediaType}`, {
         method: "GET",
       });
       const payload: unknown = await response.json().catch(() => null);
 
       if (!response.ok || !isMediaListResponse(payload)) {
-        throw new Error("Photo load failed.");
+        throw new Error("Media load failed.");
       }
 
       setAssets(payload.assets);
     } catch {
-      setErrorMessage("Photos could not be loaded.");
+      setErrorMessage(
+        mediaType === "video"
+          ? "Videos could not be loaded."
+          : "Photos could not be loaded.",
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [personaSlug]);
+  }, [mediaType, personaSlug]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -104,7 +115,7 @@ export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
   if (isLoading) {
     return (
       <section className="rounded-lg border border-stone-200 bg-white p-5 text-sm text-stone-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
-        Loading photos...
+        Loading {mediaType === "video" ? "videos" : "photos"}...
       </section>
     );
   }
@@ -119,7 +130,7 @@ export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
 
       {assets.length === 0 ? (
         <div className="rounded-lg border border-dashed border-stone-300 bg-white p-6 text-sm text-stone-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-          No photos uploaded yet.
+          No {mediaType === "video" ? "videos" : "photos"} saved yet.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -128,12 +139,24 @@ export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
               key={asset.id}
               className="overflow-hidden rounded-lg border border-stone-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
             >
-              <img
-                src={asset.url}
-                alt={asset.caption ?? "Uploaded photo"}
-                className="h-56 w-full object-cover"
-                loading="lazy"
-              />
+              {asset.media_type === "video" ? (
+                <video
+                  src={asset.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="aspect-video w-full bg-black object-contain"
+                >
+                  Your browser does not support video playback.
+                </video>
+              ) : (
+                <img
+                  src={asset.url}
+                  alt={asset.caption ?? "Uploaded photo"}
+                  className="h-56 w-full object-cover"
+                  loading="lazy"
+                />
+              )}
               <div className="space-y-2 p-3">
                 {editingId === asset.id ? (
                   <input
@@ -158,13 +181,21 @@ export default function MediaGrid({ personaSlug, refreshKey }: MediaGridProps) {
                     }}
                     className="w-full text-left text-sm text-stone-700 hover:text-stone-950 dark:text-zinc-300 dark:hover:text-zinc-100"
                   >
-                    {asset.caption ? asset.caption : "Add a caption"}
+                    {asset.caption
+                      ? asset.caption
+                      : asset.media_type === "video"
+                        ? "Add a note"
+                        : "Add a caption"}
                   </button>
                 )}
                 <p className="text-xs text-stone-500 dark:text-zinc-400">
                   {savingId === asset.id
                     ? "Saving caption..."
                     : formatStatus(asset.caption_status)}
+                </p>
+                <p className="font-mono text-xs text-stone-500 dark:text-zinc-400">
+                  {asset.media_type === "video" ? "Recorded" : "Added"}{" "}
+                  {formatDate(asset.taken_at ?? asset.created_at)}
                 </p>
               </div>
             </article>
@@ -196,17 +227,29 @@ function isMediaAsset(value: unknown): value is MediaAsset {
     !Array.isArray(value) &&
     "id" in value &&
     "b2_key" in value &&
+    "media_type" in value &&
     "caption" in value &&
     "caption_status" in value &&
+    "taken_at" in value &&
     "created_at" in value &&
     "url" in value &&
     typeof value.id === "string" &&
     typeof value.b2_key === "string" &&
+    (value.media_type === "photo" || value.media_type === "video") &&
     (typeof value.caption === "string" || value.caption === null) &&
     typeof value.caption_status === "string" &&
+    (typeof value.taken_at === "string" || value.taken_at === null) &&
     typeof value.created_at === "string" &&
     typeof value.url === "string"
   );
+}
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function formatStatus(status: string): string {
