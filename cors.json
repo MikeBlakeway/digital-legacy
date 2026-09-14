@@ -1,9 +1,21 @@
 [
   {
     "corsRuleName": "digital-legacy-uploads",
-    "allowedOrigins": ["*"],
-    "allowedHeaders": ["*"],
+    "allowedOrigins": [
+      "https://digital-legacy.dev",
+      "https://www.digital-legacy.dev",
+      "https://digital-legacy-git-codex-video-capture-mvp-mikeblakeway.vercel.app",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000"
+    ],
+    "allowedHeaders": ["content-type", "range"],
     "allowedOperations": ["s3_put", "s3_get", "s3_head"],
+    "exposeHeaders": [
+      "accept-ranges",
+      "content-length",
+      "content-range",
+      "etag"
+    ],
     "maxAgeSeconds": 3600
   }
 ]
