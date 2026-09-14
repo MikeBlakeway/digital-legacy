@@ -88,9 +88,11 @@ export async function createPresignedUploadUrl(
   const commandInput: PutObjectCommandInput = {
     Bucket: options.bucketName ?? getB2BucketName(),
     Key: validateObjectKey(params.key),
-    ContentType: params.contentType,
-    ContentLength: params.contentLength
+    ContentType: params.contentType
   }
+
+  // Browsers set Content-Length themselves. Signing that header causes
+  // Backblaze B2's S3 endpoint to reject otherwise valid browser uploads.
 
   return getSignedUrl(
     options.client ?? getB2Client(),
