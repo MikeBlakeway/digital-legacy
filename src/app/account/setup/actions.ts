@@ -8,7 +8,7 @@ export type SetPasswordState = {
   error: string | null;
 };
 
-const MINIMUM_PASSWORD_LENGTH = 12;
+const MINIMUM_PASSWORD_LENGTH = 9;
 
 export async function setPassword(
   _state: SetPasswordState,
