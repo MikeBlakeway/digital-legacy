@@ -171,13 +171,15 @@ function hasSubjectRole(claims: unknown): boolean {
 
   const appMetadata = claims.app_metadata;
 
-  if (appMetadata.role === "subject") {
+  if (appMetadata.role === "subject" || appMetadata.role === "admin") {
     return true;
   }
 
   return (
     Array.isArray(appMetadata.roles) &&
-    appMetadata.roles.some((role) => role === "subject")
+    appMetadata.roles.some(
+      (role) => role === "subject" || role === "admin",
+    )
   );
 }
 
