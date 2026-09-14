@@ -8,7 +8,7 @@ const ADMIN_SECTIONS = [
   {
     href: "/admin/users",
     label: "Users",
-    detail: "Create users, assign roles, and deactivate accounts.",
+    detail: "Invite beta persona providers and review account access.",
   },
   {
     href: "/admin/personas",

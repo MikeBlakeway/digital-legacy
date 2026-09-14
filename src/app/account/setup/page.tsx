@@ -1,6 +1,17 @@
 import PasswordSetupForm from "@/app/account/setup/PasswordSetupForm";
+import { getSafeRelativePath } from "@/lib/redirects";
 
-export default function AccountSetupPage() {
+type AccountSetupPageProps = {
+  searchParams: Promise<{ next?: string | string[] }>;
+};
+
+export default async function AccountSetupPage({
+  searchParams,
+}: AccountSetupPageProps) {
+  const values = await searchParams;
+  const nextValue = Array.isArray(values.next) ? values.next[0] : values.next;
+  const nextPath = getSafeRelativePath(nextValue, "/capture");
+
   return (
     <main className="flex flex-1 bg-stone-50 text-stone-950 dark:bg-zinc-950 dark:text-zinc-50">
       <section className="mx-auto flex w-full max-w-3xl flex-col justify-center px-6 py-16 sm:px-10">
@@ -18,7 +29,7 @@ export default function AccountSetupPage() {
         </div>
 
         <div className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
-          <PasswordSetupForm />
+          <PasswordSetupForm nextPath={nextPath} />
         </div>
       </section>
     </main>

@@ -8,7 +8,7 @@ import {
   type SetPasswordState,
 } from "@/app/account/setup/actions";
 
-export default function PasswordSetupForm() {
+export default function PasswordSetupForm({ nextPath }: { nextPath: string }) {
   const [showPasswords, setShowPasswords] = useState(false);
   const [state, formAction] = useActionState<SetPasswordState, FormData>(
     setPassword,
@@ -17,6 +17,7 @@ export default function PasswordSetupForm() {
 
   return (
     <form action={formAction} className="space-y-6">
+      <input type="hidden" name="next" value={nextPath} />
       <PasswordField
         id="password"
         label="Choose a password"

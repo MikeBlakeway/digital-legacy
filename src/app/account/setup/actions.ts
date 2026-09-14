@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { getSafeRelativePath } from "@/lib/redirects";
 import { createClient } from "@/lib/supabase/server";
 
 export type SetPasswordState = {
@@ -16,6 +17,10 @@ export async function setPassword(
 ): Promise<SetPasswordState> {
   const password = readFormString(formData, "password");
   const confirmation = readFormString(formData, "passwordConfirmation");
+  const nextPath = getSafeRelativePath(
+    readFormString(formData, "next"),
+    "/capture",
+  );
 
   if (password.length < MINIMUM_PASSWORD_LENGTH) {
     return {
@@ -40,7 +45,7 @@ export async function setPassword(
     return { error: error.message };
   }
 
-  redirect("/capture");
+  redirect(nextPath);
 }
 
 function readFormString(formData: FormData, key: string): string {

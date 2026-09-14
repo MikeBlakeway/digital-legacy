@@ -1,17 +1,15 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getSafeRelativePath } from "@/lib/redirects";
+import { readInviteRedirect } from "@/lib/auth/invite-redirects";
 import { createClient } from "@/lib/supabase/server";
-
-const DEFAULT_AUTH_REDIRECT = "/capture";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const type = readEmailOtpType(request.nextUrl.searchParams.get("type"));
-  const nextPath = getSafeRelativePath(
-    request.nextUrl.searchParams.get("next"),
-    DEFAULT_AUTH_REDIRECT,
+  const nextPath = readInviteRedirect(
+    request.nextUrl.searchParams.get("redirect_to"),
+    request.url,
   );
 
   if (!tokenHash || !type) {

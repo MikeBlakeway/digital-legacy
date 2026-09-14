@@ -8,5 +8,16 @@ export function getSafeRelativePath(
     return fallback;
   }
 
-  return path;
+  try {
+    const baseUrl = new URL("https://safe-redirect.invalid");
+    const parsed = new URL(path, baseUrl);
+
+    if (parsed.origin !== baseUrl.origin) {
+      return fallback;
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
 }
