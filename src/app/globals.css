@@ -216,6 +216,7 @@
 html {
   background: var(--bg);
   color: var(--fg1);
+  min-height: 100%;
 }
 
 body {
@@ -224,6 +225,8 @@ body {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   line-height: 1.6;
+  min-height: 100vh;
+  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATH_PREFIXES = ["/login", "/auth"];
+const PUBLIC_PATHS = new Set(["/manifest.webmanifest", "/robots.txt"]);
 
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   let response = createNextResponse(request);
@@ -48,8 +49,11 @@ export function isProtectedPath(pathname: string): boolean {
 }
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATH_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  return (
+    PUBLIC_PATHS.has(pathname) ||
+    PUBLIC_PATH_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
   );
 }
 

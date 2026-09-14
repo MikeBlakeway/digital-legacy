@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Manrope, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -19,6 +19,34 @@ const ibmPlexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "Digital Legacy",
   description: "Private AI persona capture and conversation platform.",
+  applicationName: "Digital Legacy",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Digital Legacy",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f9f8f6" },
+    { media: "(prefers-color-scheme: dark)", color: "#18130f" },
+  ],
 };
 
 export default function RootLayout({
