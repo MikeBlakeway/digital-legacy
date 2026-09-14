@@ -12,7 +12,7 @@ export default function AccountSetupPage() {
             Finish setting up your account
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-stone-700 dark:text-zinc-300">
-            Choose a password for future visits. Use at least 12 characters and
+            Choose a password for future visits. Use at least 9 characters and
             keep it somewhere safe.
           </p>
         </div>

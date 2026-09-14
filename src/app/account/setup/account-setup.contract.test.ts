@@ -9,6 +9,9 @@ const formSource = readFileSync(join(directory, "PasswordSetupForm.tsx"), "utf8"
 assert.match(actionSource, /getClaims\(\)/);
 assert.match(actionSource, /updateUser\(\{ password \}\)/);
 assert.match(actionSource, /password !== confirmation/);
-assert.match(actionSource, /MINIMUM_PASSWORD_LENGTH = 12/);
+assert.match(actionSource, /MINIMUM_PASSWORD_LENGTH = 9/);
 assert.match(formSource, /autoComplete="new-password"/);
-assert.match(formSource, /minLength=\{12\}/);
+assert.match(formSource, /minLength=\{9\}/);
+assert.match(formSource, /useState\(false\)/);
+assert.match(formSource, /type=\{showPassword \? "text" : "password"\}/);
+assert.match(formSource, />\s*Show passwords\s*</);
