@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Manrope, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import ThemeScript from "@/components/theme/ThemeScript";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -43,10 +44,6 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   colorScheme: "light dark",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f9f8f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#18130f" },
-  ],
 };
 
 export default function RootLayout({
@@ -57,8 +54,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`h-full antialiased ${manrope.variable} ${ibmPlexMono.variable}`}
     >
+      <head>
+        <meta
+          id="theme-color"
+          name="theme-color"
+          content="#f9f8f6"
+          suppressHydrationWarning
+        />
+        <ThemeScript />
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <Analytics />

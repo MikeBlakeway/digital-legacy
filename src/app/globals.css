@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Theme utilities follow the resolved app preference, rather than the device
+   media query alone. The early theme script sets this attribute before paint. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ============================================================
    DIGITAL LEGACY — DESIGN TOKENS · "THE ARCHIVE"
    Warm white · ink · oxblood sealing wax · amber
@@ -70,41 +74,42 @@
   --duration: 180ms;
   --duration-slow: 320ms;
 
-  /* ── SEMANTIC TOKENS (light) ────────────────────────────── */
-  --color-bg:             var(--color-paper);
-  --color-surface:        var(--color-page);
-  --color-surface-2:      var(--color-warm-100);
-  --color-surface-3:      var(--color-warm-200);
+  /* ── SEMANTIC TOKENS (runtime theme) ────────────────────── */
+  --color-bg:             var(--bg);
+  --color-surface:        var(--surface);
+  --color-surface-2:      var(--surface-2);
+  --color-surface-3:      var(--surface-3);
 
-  --color-fg1:            var(--color-ink);
-  --color-fg2:            var(--color-stone-600);
-  --color-fg3:            var(--color-stone-500);
-  --color-fg4:            var(--color-stone-400);
+  --color-fg1:            var(--fg1);
+  --color-fg2:            var(--fg2);
+  --color-fg3:            var(--fg3);
+  --color-fg4:            var(--fg4);
 
-  --color-border:         var(--color-warm-200);
-  --color-border-strong:  var(--color-warm-300);
-  --color-border-hover:   var(--color-stone-400);
+  --color-border:         var(--border);
+  --color-border-strong:  var(--border-strong);
+  --color-border-hover:   var(--border-hover);
 
-  --color-primary:        var(--color-ink);
-  --color-primary-hover:  var(--color-ink-soft);
-  --color-primary-fg:     #faf7f1;
+  --color-primary:        var(--primary);
+  --color-primary-hover:  var(--primary-hover);
+  --color-primary-fg:     var(--primary-fg);
 
-  --color-accent:         var(--color-wax);
-  --color-accent-hover:   var(--color-wax-deep);
-  --color-accent-soft:    var(--color-wax-soft);
-  --color-accent-fg:      var(--color-wax-fg);
+  --color-accent:         var(--accent);
+  --color-accent-hover:   var(--accent-hover);
+  --color-accent-soft:    var(--accent-soft);
+  --color-accent-fg:      var(--accent-fg);
 
-  --color-memory:         var(--color-amber);
-  --color-memory-soft:    var(--color-amber-soft);
-  --color-memory-fg:      var(--color-amber-fg);
+  --color-memory:         var(--memory);
+  --color-memory-soft:    var(--memory-soft);
+  --color-memory-fg:      var(--memory-fg);
 
-  --color-success:        var(--color-green);
-  --color-danger:         var(--color-wax);
-  --color-caution:        var(--color-amber);
+  --color-success:        var(--success);
+  --color-danger:         var(--danger);
+  --color-caution:        var(--caution);
 }
 
 /* ── CSS CUSTOM PROPERTIES (accessible to non-Tailwind CSS) ── */
 :root {
+  color-scheme: light;
   --bg:             #f9f8f6;
   --surface:        #ffffff;
   --surface-2:      #f4f2ef;
@@ -155,6 +160,7 @@
 
 /* ── DARK MODE ───────────────────────────────────────────── */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg:             #18130f;
   --surface:        #211b16;
   --surface-2:      #2b2219;

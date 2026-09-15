@@ -13,6 +13,7 @@ import {
 
 import { signOut } from "@/app/(app)/actions";
 import { Logo } from "@/components/ui/Logo";
+import ThemeSelector from "@/components/theme/ThemeSelector";
 import {
   chooseNavigationPersona,
   createPrimaryNavigation,
@@ -580,6 +581,8 @@ function MoreActions({
           onNavigate={onNavigate}
         />
       ) : null}
+
+      <ThemeSelector />
 
       <form action={signOut}>
         <button

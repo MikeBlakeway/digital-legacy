@@ -38,13 +38,13 @@ export default async function Home() {
   );
 
   return (
-    <main className="flex flex-1 bg-stone-50 text-stone-950 dark:bg-zinc-950 dark:text-zinc-50">
+    <main className="flex flex-1 bg-bg text-fg1">
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-16 sm:px-10">
         <div>
           <h1 className="text-3xl font-semibold tracking-normal sm:text-4xl">
             Digital Legacy
           </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-stone-700 dark:text-zinc-300">
+          <p className="mt-4 max-w-2xl text-base leading-7 text-fg2">
             Choose a persona to continue.
           </p>
         </div>
@@ -95,23 +95,23 @@ function PersonaCard({ card }: { card: PersonaCardViewModel }) {
   return (
     <Link
       href={card.href}
-      className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm transition hover:border-stone-400 hover:bg-stone-100 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-600 dark:hover:bg-zinc-800"
+      className="rounded-lg border border-border bg-surface p-5 shadow-sm transition hover:border-border-hover hover:bg-surface-2"
     >
       <div className="flex items-start gap-4">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-stone-100 text-xl font-semibold text-stone-800 dark:bg-zinc-800 dark:text-zinc-100">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-surface-2 text-xl font-semibold text-fg1">
           {card.persona.name.trim().slice(0, 1).toUpperCase() || "?"}
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase text-stone-500 dark:text-zinc-400">
+          <p className="text-xs font-medium uppercase text-fg3">
             {card.persona.access_mode === "capture" ? "Capture" : "Conversation"}
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-stone-950 dark:text-zinc-50">
+          <h2 className="mt-1 text-lg font-semibold text-fg1">
             {card.persona.name}
           </h2>
-          <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-zinc-300">
+          <p className="mt-2 text-sm leading-6 text-fg2">
             {card.supportingText}
           </p>
-          <span className="mt-4 inline-block text-sm font-medium text-stone-900 dark:text-zinc-100">
+          <span className="mt-4 inline-block text-sm font-medium text-fg1">
             {card.cta}
           </span>
         </div>
@@ -122,18 +122,18 @@ function PersonaCard({ card }: { card: PersonaCardViewModel }) {
 
 function EmptyHomeState({ isAdmin }: { isAdmin: boolean }) {
   return (
-    <div className="rounded-lg border border-dashed border-stone-300 bg-white p-6 text-sm text-stone-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+    <div className="rounded-lg border border-dashed border-border-strong bg-surface p-6 text-sm text-fg2">
       {isAdmin ? (
         <Link
           href="/admin"
-          className="font-medium text-stone-950 hover:text-stone-700 dark:text-zinc-50 dark:hover:text-zinc-300"
+          className="font-medium text-fg1 hover:text-fg2"
         >
           Open admin dashboard
         </Link>
       ) : (
         <Link
           href="/capture/new"
-          className="font-medium text-stone-950 hover:text-stone-700 dark:text-zinc-50 dark:hover:text-zinc-300"
+          className="font-medium text-fg1 hover:text-fg2"
         >
           Create your persona
         </Link>
