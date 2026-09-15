@@ -2,6 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import EmotionalCoverageGrid from "@/components/capture/EmotionalCoverageGrid";
+import {
+  formatApproximateStoryTime,
+  getProfileProgress,
+} from "@/components/capture/personality-profile-utils";
 import VoiceDashboardWidget from "@/components/capture/VoiceDashboardWidget";
 import VoiceReadinessIndicator from "@/components/capture/VoiceReadinessIndicator";
 import { countWords, getDiaryStats } from "@/lib/supabase/diary";
@@ -78,6 +82,9 @@ export default async function CaptureDashboardPage({
     0,
   );
   const totalTraitWords = diaryStats.total_word_count + interviewWordCount;
+  const profileProgress = getProfileProgress({
+    totalWordCount: totalTraitWords,
+  });
 
   return (
     <main className="flex flex-1 bg-stone-50 text-stone-950 dark:bg-zinc-950 dark:text-zinc-50">
@@ -124,7 +131,9 @@ export default async function CaptureDashboardPage({
             <StatCard
               label="Diary"
               value={`${diaryStats.total_entries} entries`}
-              detail={`${diaryStats.total_word_count} words`}
+              detail={`${formatApproximateStoryTime(
+                diaryStats.total_word_count,
+              )} of story content`}
             />
             <StatCard
               label="Interviews"
@@ -152,7 +161,9 @@ export default async function CaptureDashboardPage({
             <span className="font-medium">Personality profile: </span>
             {traits
               ? `Last updated ${formatDate(traits.computed_at)}.`
-              : `Not yet generated - need 500 words minimum (currently ${totalTraitWords} words).`}
+              : `Not yet generated - add ${formatApproximateStoryTime(
+                  profileProgress.wordsRemaining,
+                )} of diary or interview story content.`}
           </div>
         </section>
 
@@ -195,13 +206,13 @@ export default async function CaptureDashboardPage({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <QuickAction
               href={`/capture/${persona.slug}/diary/new`}
-              label="Write a diary entry"
-              detail="Capture a free-form story or recording."
+              label="Add a diary story"
+              detail="Tell a free-form story by voice or text."
             />
             <QuickAction
               href={`/capture/${persona.slug}/interview`}
               label="Start an interview"
-              detail="Answer structured questions with the interviewer."
+              detail="Respond to guided questions by voice or text."
             />
             <QuickAction
               href={`/capture/${persona.slug}/photos`}

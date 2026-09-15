@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  formatApproximateStoryTime,
+} from "@/components/capture/personality-profile-utils";
+
 type TraitInferenceButtonProps = {
   personaSlug: string;
   actionLabel?: string;
@@ -124,7 +128,8 @@ function StatusMessage({
   if (state.status === "insufficient") {
     return (
       <p className="text-sm text-amber-700 dark:text-amber-300">
-        {state.wordCount} words captured. {state.minimum} words are needed.
+        Add {formatApproximateStoryTime(state.minimum - state.wordCount)} of
+        story content before refreshing your profile.
       </p>
     );
   }

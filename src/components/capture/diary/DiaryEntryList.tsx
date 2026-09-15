@@ -1,3 +1,6 @@
+import {
+  formatApproximateStoryTime,
+} from "@/components/capture/personality-profile-utils";
 import { EMOTION_OPTIONS } from "@/lib/capture/emotions";
 import type { DiaryEntryListItem } from "@/lib/supabase/diary";
 
@@ -9,7 +12,7 @@ export default function DiaryEntryList({ entries }: DiaryEntryListProps) {
   if (entries.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-stone-300 bg-white p-6 text-sm text-stone-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
-        No diary entries yet.
+        No diary stories yet.
       </div>
     );
   }
@@ -36,7 +39,9 @@ export default function DiaryEntryList({ entries }: DiaryEntryListProps) {
                 </span>
               ) : null}
               {entry.has_voice ? <span>Voice</span> : null}
-              {entry.word_count ? <span>{entry.word_count} words</span> : null}
+              {entry.word_count ? (
+                <span>{formatApproximateStoryTime(entry.word_count)}</span>
+              ) : null}
             </div>
             <p className="mt-3 text-sm leading-6 text-stone-800 dark:text-zinc-100">
               {entry.preview}

@@ -1,6 +1,9 @@
 import type { PersonaTraits } from "@/lib/supabase/traits";
 
 export const MINIMUM_PROFILE_WORDS = 500;
+// The model still evaluates transcript content; this converts that internal
+// threshold into the approximate speaking time people experience while recording.
+const SPOKEN_WORDS_PER_MINUTE = 125;
 
 export type ProfileProgress = {
   canGenerate: boolean;
@@ -19,7 +22,27 @@ export function formatProfileMetadata({
   completedInterviewCount: number;
   totalWordCount: number;
 }): string {
-  return `Based on ${formatCount(diaryEntryCount, "diary entry", "diary entries")} and ${formatCount(completedInterviewCount, "interview session", "interview sessions")} (${totalWordCount} words). Last updated ${formatProfileDate(traits.computed_at)}.`;
+  return `Based on ${formatCount(diaryEntryCount, "diary story", "diary stories")} and ${formatCount(completedInterviewCount, "guided interview", "guided interviews")} (${formatApproximateStoryTime(totalWordCount)} of story content). Last updated ${formatProfileDate(traits.computed_at)}.`;
+}
+
+export function formatApproximateStoryTime(wordCount: number): string {
+  const normalizedWords = Math.max(0, wordCount);
+
+  if (normalizedWords === 0) {
+    return "0 min";
+  }
+
+  const seconds = (normalizedWords / SPOKEN_WORDS_PER_MINUTE) * 60;
+
+  if (seconds < 60) {
+    const roundedSeconds = Math.max(
+      15,
+      Math.min(45, Math.round(seconds / 15) * 15),
+    );
+    return `about ${roundedSeconds} sec`;
+  }
+
+  return `about ${Math.max(1, Math.round(seconds / 60))} min`;
 }
 
 export function formatDominantValue(value: string): string {

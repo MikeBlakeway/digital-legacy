@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import DiaryEntryList from "@/components/capture/diary/DiaryEntryList";
+import {
+  formatApproximateStoryTime,
+} from "@/components/capture/personality-profile-utils";
 import { EMOTION_OPTIONS } from "@/lib/capture/emotions";
 import {
   getDiaryStats,
@@ -54,7 +57,7 @@ export default async function DiaryHomePage({ params }: DiaryHomePageProps) {
             href={`/capture/${persona.slug}/diary/new`}
             className="rounded-md bg-stone-900 px-5 py-2.5 text-center text-sm font-medium text-white hover:bg-stone-700 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-300"
           >
-            New entry
+            New story
           </Link>
         </div>
 
@@ -62,7 +65,7 @@ export default async function DiaryHomePage({ params }: DiaryHomePageProps) {
 
         <div>
           <h2 className="mb-4 text-lg font-semibold text-stone-950 dark:text-zinc-50">
-            Recent entries
+            Recent stories
           </h2>
           <DiaryEntryList entries={entries} />
         </div>
@@ -75,10 +78,14 @@ function DiarySummary({ stats }: { stats: DiaryStats }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
       <div className="rounded-lg border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="text-sm text-stone-500 dark:text-zinc-400">Entries</p>
+        <p className="text-sm text-stone-500 dark:text-zinc-400">Stories</p>
         <p className="mt-2 text-3xl font-semibold">{stats.total_entries}</p>
-        <p className="mt-4 text-sm text-stone-500 dark:text-zinc-400">Words</p>
-        <p className="mt-2 text-3xl font-semibold">{stats.total_word_count}</p>
+        <p className="mt-4 text-sm text-stone-500 dark:text-zinc-400">
+          Story time
+        </p>
+        <p className="mt-2 text-3xl font-semibold">
+          {formatApproximateStoryTime(stats.total_word_count)}
+        </p>
       </div>
 
       <div className="rounded-lg border border-stone-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">

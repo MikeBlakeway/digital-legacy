@@ -485,8 +485,8 @@ function CaptureActions({
       <DrawerLink
         href={`${base}/diary/new`}
         icon="journal"
-        label="Write a diary entry"
-        detail="Capture a story in text or audio."
+        label="Add a diary story"
+        detail="Tell a story by voice or text."
         onNavigate={onNavigate}
       />
       <DrawerLink

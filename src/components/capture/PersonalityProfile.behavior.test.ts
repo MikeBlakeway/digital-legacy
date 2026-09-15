@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   MINIMUM_PROFILE_WORDS,
+  formatApproximateStoryTime,
   formatDominantValue,
   formatProfileMetadata,
   getProfileProgress,
@@ -38,8 +39,13 @@ const metadata = formatProfileMetadata({
 
 assert.equal(
   metadata,
-  "Based on 4 diary entries and 2 interview sessions (864 words). Last updated 1 February 2026.",
+  "Based on 4 diary stories and 2 guided interviews (about 7 min of story content). Last updated 1 February 2026.",
 );
+
+assert.equal(formatApproximateStoryTime(0), "0 min");
+assert.equal(formatApproximateStoryTime(50), "about 30 sec");
+assert.equal(formatApproximateStoryTime(125), "about 1 min");
+assert.equal(formatApproximateStoryTime(500), "about 4 min");
 
 assert.equal(formatDominantValue("self-direction"), "Self Direction");
 assert.equal(formatDominantValue("benevolence"), "Benevolence");

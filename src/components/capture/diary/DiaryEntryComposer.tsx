@@ -106,10 +106,10 @@ export default function DiaryEntryComposer({ personaSlug }: DiaryEntryComposerPr
     return (
       <div className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-8">
         <h2 className="text-xl font-semibold text-stone-950 dark:text-zinc-50">
-          Entry saved
+          Story saved
         </h2>
         <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-zinc-300">
-          Your diary entry has been saved.
+          Your diary story has been saved.
         </p>
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <button

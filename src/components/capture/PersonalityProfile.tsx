@@ -3,6 +3,7 @@ import Link from "next/link";
 import TraitInferenceButton from "@/components/capture/TraitInferenceButton";
 import {
   MINIMUM_PROFILE_WORDS,
+  formatApproximateStoryTime,
   formatDominantValue,
   formatProfileMetadata,
   getProfileProgress,
@@ -12,6 +13,7 @@ import type { PersonaTraits } from "@/lib/supabase/traits";
 
 export {
   MINIMUM_PROFILE_WORDS,
+  formatApproximateStoryTime,
   formatDominantValue,
   formatProfileMetadata,
   getProfileProgress,
@@ -45,8 +47,8 @@ export default function PersonalityProfile({
             Personality profile
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-stone-700 dark:text-zinc-300">
-            Your personality profile hasn&apos;t been generated yet. Add diary
-            entries or complete an interview session to get started.
+            Record a diary story or complete a guided interview to start
+            shaping your profile.
           </p>
         </div>
 
@@ -65,7 +67,9 @@ export default function PersonalityProfile({
             disabledMessage={
               progress.canGenerate
                 ? undefined
-                : `${progress.wordsRemaining} more words needed before a profile can be generated.`
+                : `Add ${formatApproximateStoryTime(
+                    progress.wordsRemaining,
+                  )} of story content before generating your profile.`
             }
             successMessage="Profile generated."
           />
@@ -75,7 +79,7 @@ export default function PersonalityProfile({
                 href={`/capture/${personaSlug}/diary/new`}
                 className="font-medium text-stone-900 hover:text-stone-600 dark:text-zinc-100 dark:hover:text-zinc-300"
               >
-                Add a diary entry
+                Add a diary story
               </Link>
               <span className="hidden text-stone-300 dark:text-zinc-700 sm:inline">
                 /
@@ -84,7 +88,7 @@ export default function PersonalityProfile({
                 href={`/capture/${personaSlug}/interview`}
                 className="font-medium text-stone-900 hover:text-stone-600 dark:text-zinc-100 dark:hover:text-zinc-300"
               >
-                Complete an interview
+                Complete a guided interview
               </Link>
             </div>
           ) : null}
@@ -164,13 +168,19 @@ function ContentProgress({
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
       <div className="grid gap-4 sm:grid-cols-3">
-        <ProgressMetric label="Diary entries" value={diaryEntryCount} />
-        <ProgressMetric label="Interviews complete" value={completedInterviewCount} />
-        <ProgressMetric label="Words captured" value={totalWordCount} />
+        <ProgressMetric label="Diary stories" value={diaryEntryCount} />
+        <ProgressMetric
+          label="Interviews complete"
+          value={completedInterviewCount}
+        />
+        <ProgressMetric
+          label="Story time"
+          value={formatApproximateStoryTime(totalWordCount)}
+        />
       </div>
       <div className="mt-6">
         <div className="flex items-center justify-between text-sm text-stone-600 dark:text-zinc-300">
-          <span>{totalWordCount} / {MINIMUM_PROFILE_WORDS} words</span>
+          <span>Profile readiness</span>
           <span>{progress.percent}%</span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-stone-200 dark:bg-zinc-800">
@@ -184,7 +194,13 @@ function ContentProgress({
   );
 }
 
-function ProgressMetric({ label, value }: { label: string; value: number }) {
+function ProgressMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string;
+}) {
   return (
     <div className="rounded-md border border-stone-200 bg-stone-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
       <p className="text-sm text-stone-500 dark:text-zinc-400">{label}</p>

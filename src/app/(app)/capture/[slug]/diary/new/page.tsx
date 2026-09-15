@@ -31,7 +31,7 @@ export default async function NewDiaryEntryPage({ params }: NewDiaryEntryPagePro
             Back to diary
           </Link>
           <h1 className="mt-4 text-3xl font-semibold tracking-normal sm:text-4xl">
-            New diary entry
+            New diary story
           </h1>
         </div>
 

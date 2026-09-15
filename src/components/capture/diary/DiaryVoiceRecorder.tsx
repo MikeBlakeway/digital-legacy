@@ -38,7 +38,7 @@ export default function DiaryVoiceRecorder({
   uploadKeyPrefix = 'diary',
   uploadOnStop = true,
   uploadButtonLabel = 'Upload recording',
-  microphoneErrorMessage = 'Microphone access is required to record a diary entry.',
+  microphoneErrorMessage = 'Microphone access is required to record a diary story.',
   readyMessage = 'Recording ready to save.',
   onRecordingComplete
 }: DiaryVoiceRecorderProps) {

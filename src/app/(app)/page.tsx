@@ -77,7 +77,7 @@ async function buildPersonaCard(
       persona,
       href: `/capture/${persona.slug}`,
       cta: "Continue building",
-      supportingText: `${diaryStats.total_entries} diary entries - ${formatMinutes(
+      supportingText: `${diaryStats.total_entries} diary stories - ${formatMinutes(
         voiceOverview.total_duration_seconds,
       )} voice captured`,
     };
