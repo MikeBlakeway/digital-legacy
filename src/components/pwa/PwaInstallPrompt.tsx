@@ -75,7 +75,7 @@ export default function PwaInstallPrompt() {
   return (
     <aside
       aria-label="Install Digital Legacy"
-      className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-lg rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-[var(--fg1)] shadow-lg"
+      className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-lg rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-4 text-[var(--fg1)] shadow-lg md:bottom-4"
     >
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">

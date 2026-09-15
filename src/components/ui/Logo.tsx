@@ -8,13 +8,13 @@ interface LogoProps {
 }
 
 /**
- * Digital Legacy wordmark.
+ * Digital Legacy emblem.
  * "auto" renders both and hides/shows via CSS — use when the page background
  * may be light or dark at render time (e.g. a sticky nav).
  */
 export function Logo({
   variant = "auto",
-  width = 120,
+  width = 40,
   height = 40,
   className = "",
 }: LogoProps) {

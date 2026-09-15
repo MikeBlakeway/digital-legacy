@@ -33,10 +33,6 @@ export default async function Home() {
   const serviceClient = createServiceRoleClient();
   const personas = await listAccessiblePersonas(serviceClient, userId);
 
-  if (personas.length === 1) {
-    redirect(defaultPersonaHref(personas[0]));
-  }
-
   const cards = await Promise.all(
     personas.map((persona) => buildPersonaCard(serviceClient, persona)),
   );
@@ -144,12 +140,6 @@ function EmptyHomeState({ isAdmin }: { isAdmin: boolean }) {
       )}
     </div>
   );
-}
-
-function defaultPersonaHref(persona: AccessiblePersona): string {
-  return persona.access_mode === "capture"
-    ? `/capture/${persona.slug}`
-    : `/talk/${persona.slug}`;
 }
 
 function formatBiographicalSummary(persona: AccessiblePersona): string {
